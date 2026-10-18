@@ -1,4 +1,3 @@
-import com.movtery.zalithlauncher.context.GlobalContext
 /*
  * Zalith Launcher 2
  * Copyright (C) 2025 MovTery <movtery228@qq.com> and contributors
@@ -29,6 +28,7 @@ import androidx.compose.ui.unit.IntSize
 import com.movtery.zalithlauncher.BuildKeys
 import com.movtery.zalithlauncher.bridge.LoggerBridge
 import com.movtery.zalithlauncher.bridge.ZLBridge
+import com.movtery.zalithlauncher.context.GlobalContext
 import com.movtery.zalithlauncher.bridge.ZLNativeInvoker
 import com.movtery.zalithlauncher.game.multirt.Runtime
 import com.movtery.zalithlauncher.game.multirt.RuntimesManager
