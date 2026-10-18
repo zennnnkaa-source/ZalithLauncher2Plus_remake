@@ -1,13 +1,13 @@
 
-# Zalith Launcher 2+ (PLUS)
+# Zalith Launcher 2+ (PLUS) (Remake)
 
 [**「English」**](./README.md) | [中文（简体）](./README_ZH_CN.md) | [中文（台灣）](./README_ZH_TW.md) | [Türkçe](./README_TR.md)
 
 > **⚠️ UNOFFICIAL MODIFIED VERSION**
 > 
-> This is an unofficial fork of [Zalith Launcher 2](https://github.com/ZalithLauncher/ZalithLauncher2). This project is **not affiliated with or endorsed by the official Zalith Launcher project**.
+> This is an unofficial fork of [Zalith Launcher 2+](https://github.com/Star1xr/ZalithLauncher2Plus), which is a unofficial port of [Zalith Launcher 2](https://github.com/ZalithLauncher/ZalithLauncher2). This project is **not affiliated with or endorsed by the official Zalith Launcher project**.
 
-**Zalith Launcher 2+** is a community-modified launcher for **Android devices** tailored for [Minecraft: Java Edition](https://www.minecraft.net/). It builds upon the foundation of [Zalith Launcher 2](https://github.com/ZalithLauncher/ZalithLauncher2), utilizing [PojavLauncher](https://github.com/PojavLauncherTeam/PojavLauncher/tree/v3_openjdk/app_pojavlauncher/src/main/jni) as its core launching engine with a modern UI built using **Jetpack Compose** and **Material Design 3**.
+**Zalith Launcher 2+ Remake** is a community-modified launcher for **Android devices** tailored for [Minecraft: Java Edition](https://www.minecraft.net/). It builds upon the foundation of [Zalith Launcher 2](https://github.com/ZalithLauncher/ZalithLauncher2), utilizing [PojavLauncher](https://github.com/PojavLauncherTeam/PojavLauncher/tree/v3_openjdk/app_pojavlauncher/src/main/jni) as its core launching engine with a modern UI built using **Jetpack Compose** and **Material Design 3**.
 
 ## Some Statistics
 
@@ -102,9 +102,11 @@ This is a community fork. Before contributing:
 ## 📞 Contact & Links
 
 - **Original Project:** https://github.com/ZalithLauncher/ZalithLauncher2
-- **This Fork:** https://github.com/Star1xr/ZalithLauncher2Plus
+- **Old Fork:** https://github.com/Star1xr/ZalithLauncher2Plus
+- **This Fork:** https://github.com/zennnnkaa-source/ZalithLauncher2Plus_remake
 
 ---
 
 **Zalith Launcher 2** is the original project created and maintained by the Zalith Launcher team.  
 **Zalith Launcher 2+** is an unofficial community fork created to provide enhanced features and modifications.
+**Zalith Launcher 2+ Remake** is an unofficial community fork created to continue the work of Star1xr.
