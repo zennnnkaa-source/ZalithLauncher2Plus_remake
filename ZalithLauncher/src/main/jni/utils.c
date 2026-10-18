@@ -201,3 +201,12 @@ jintArray convertIntArrayJVM(JNIEnv* srcEnv, JNIEnv* dstEnv, jintArray srcIntArr
     (*srcEnv)->ReleaseIntArrayElements(srcEnv, srcIntArray, srcPtr, JNI_ABORT);
     return dstIntArray;
 }
+
+
+#include "sdl_hook.h"
+
+JNIEXPORT jboolean JNICALL
+Java_com_movtery_zalithlauncher_game_sdl_SdlBridge_nativeRunDeferredSdlJniOnLoad(JNIEnv *env, jclass clazz) {
+    (void) env; (void) clazz;
+    return run_deferred_sdl_jni_onload() ? JNI_TRUE : JNI_FALSE;
+}

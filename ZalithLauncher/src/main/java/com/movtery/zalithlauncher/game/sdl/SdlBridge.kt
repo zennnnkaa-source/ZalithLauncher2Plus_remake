@@ -133,6 +133,25 @@ object SdlBridge {
 
     @JvmStatic
     @Synchronized
+    @JvmStatic
+    private external fun nativeRunDeferredSdlJniOnLoad(): Boolean
+
+    /**
+     * Run real SDL JNI_OnLoad outside ART LoadNativeLibrary (avoids SIGSEGV on some devices).
+     */
+    @JvmStatic
+    @Synchronized
+    fun runDeferredJniOnLoad(): Boolean {
+        return try {
+            nativeRunDeferredSdlJniOnLoad()
+        } catch (t: Throwable) {
+            android.util.Log.e("SdlBridge", "runDeferredJniOnLoad failed", t)
+            false
+        }
+    }
+
+    @JvmStatic
+    @Synchronized
     fun setupJNI(): Boolean {
         if (jniReady) {
             return true

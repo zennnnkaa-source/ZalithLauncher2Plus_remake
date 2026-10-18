@@ -360,6 +360,12 @@ public class CallbackBridge {
                             System.loadLibrary("SDL2");
                         } catch (UnsatisfiedLinkError ignored) {
                         }
+                        // Real JNI_OnLoad was deferred during loadLibrary (ART FindClass SIGSEGV
+                        // on some devices if OnLoad runs inside LoadNativeLibrary).
+                        LoggerBridge.append("ZalithLauncher: running deferred SDL JNI_OnLoad");
+                        if (!SdlBridge.runDeferredJniOnLoad()) {
+                            throw new UnsatisfiedLinkError("deferred SDL JNI_OnLoad failed");
+                        }
                         LoggerBridge.append("ZalithLauncher: setting up SDL JNI");
                         SdlBridge.setupJNI();
                         LoggerBridge.append("ZalithLauncher: binding SDL surface");
