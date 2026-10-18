@@ -347,25 +347,11 @@ public class CallbackBridge {
                         return true;
                     }
                     try {
-                        Class.forName("org.libsdl.app.SDLActivity");
-                        Class.forName("org.libsdl.app.SDL");
-                        Class.forName("org.libsdl.app.SDLSurface");
-                        Class.forName("org.libsdl.app.SDLAudioManager");
-                        Class.forName("org.libsdl.app.SDLControllerManager");
-
+                        // Official path (ZalithLauncher2): load + setupJNI + bind surface
                         LoggerBridge.append("ZalithLauncher: loading SDL3");
                         System.loadLibrary("SDL3");
                         LoggerBridge.append("ZalithLauncher: loading SDL2");
-                        try {
-                            System.loadLibrary("SDL2");
-                        } catch (UnsatisfiedLinkError ignored) {
-                        }
-                        // Real JNI_OnLoad was deferred during loadLibrary (ART FindClass SIGSEGV
-                        // on some devices if OnLoad runs inside LoadNativeLibrary).
-                        LoggerBridge.append("ZalithLauncher: running deferred SDL JNI_OnLoad");
-                        if (!SdlBridge.runDeferredJniOnLoad()) {
-                            throw new UnsatisfiedLinkError("deferred SDL JNI_OnLoad failed");
-                        }
+                        System.loadLibrary("SDL2");
                         LoggerBridge.append("ZalithLauncher: setting up SDL JNI");
                         SdlBridge.setupJNI();
                         LoggerBridge.append("ZalithLauncher: binding SDL surface");
@@ -388,11 +374,8 @@ public class CallbackBridge {
                     }
                 }
                 if (action[0] == ACTION_SEND_TEXTBOX_RECT) {
-                    // TODO
+                    // TODO: 输入框位置同步（后续接入）
                 }
-                break;
-            default:
-                break;
         }
         return false;
     }
