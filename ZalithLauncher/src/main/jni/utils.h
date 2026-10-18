@@ -53,3 +53,6 @@ void hookExec();
 void installLwjglDlopenHook();
 void installEMUIIteratorMititgation();
 JNIEXPORT jstring JNICALL Java_org_lwjgl_glfw_CallbackBridge_nativeClipboard(JNIEnv* env, jclass clazz, jint action, jbyteArray copySrc);
+
+void sdl_set_original_jni_onload(void *fn);
+int run_deferred_sdl_jni_onload(void);

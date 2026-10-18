@@ -1,11 +1,13 @@
 // SDL JNI_OnLoad isolation for the embedded game JVM.
-// On some devices (e.g. ZTE Unisoc API 33) calling the real SDL JNI_OnLoad
-// *inside* ART LoadNativeLibrary (System.loadLibrary) SIGSEGVs in FindClass.
-// Strategy:
-//   1) During LoadNativeLibrary, only capture the real OnLoad pointer and return
-//      JNI_VERSION_1_4 (do NOT invoke original yet).
-//   2) After loadLibrary returns, call run_deferred_sdl_jni_onload() from ART
-//      (outside LoadNativeLibrary) to perform RegisterNatives safely.
+// On some devices (ZTE Unisoc API 33) calling real SDL JNI_OnLoad *inside*
+// ART LoadNativeLibrary SIGSEGVs in FindClass.
+//
+// Strategy (aligned with official isolation + device fix):
+//   1) Intercept dlsym("JNI_OnLoad") for libSDL3; replace with stub that only
+//      returns JNI_VERSION_1_4 (does NOT run real OnLoad during LoadNativeLibrary).
+//   2) Save real OnLoad into pojavexec via sdl_set_original_jni_onload().
+//   3) After System.loadLibrary returns, Java calls SdlBridge.runDeferredJniOnLoad()
+//      which runs the real OnLoad outside LoadNativeLibrary.
 
 #include <dlfcn.h>
 #include <jni.h>
@@ -25,14 +27,10 @@ typedef bytehook_stub_t (*bytehook_hook_all_fn)(const char *callee_path_name, co
                                                   void *new_func, bytehook_hooked_t hooked, void *hooked_arg);
 
 static void *sdlHandle;
-static jni_on_load_func_t originalSdlJniOnLoad;
-static volatile int sSdlJniOnLoadDone = 0;
 
 static jint isolatedSdlJniOnLoad(JavaVM *vm, void *reserved) {
     (void) reserved;
-    /* Capture only — never run real OnLoad while still inside LoadNativeLibrary. */
-    if (originalSdlJniOnLoad != NULL && pojav_environ != NULL
-            && pojav_environ->dalvikJavaVMPtr == vm) {
+    if (pojav_environ != NULL && pojav_environ->dalvikJavaVMPtr == vm) {
         LOG_TO_I("SDL_Hook: deferring real JNI_OnLoad (vm=%p) until after loadLibrary", (void *) vm);
     } else {
         LOG_TO_I("SDL_Hook: skip JNI_OnLoad for non-Dalvik vm=%p", (void *) vm);
@@ -40,40 +38,45 @@ static jint isolatedSdlJniOnLoad(JavaVM *vm, void *reserved) {
     return JNI_VERSION_1_4;
 }
 
-/* Call after System.loadLibrary("SDL3") has returned, on ART. */
-int run_deferred_sdl_jni_onload(void) {
-    if (sSdlJniOnLoadDone) {
-        LOG_TO_I("SDL_Hook: deferred JNI_OnLoad already done");
+static int is_sdl3_jni_onload(void *handle, const char *symbol, void *result) {
+    if (symbol == NULL || strcmp(symbol, "JNI_OnLoad") != 0 || result == NULL) {
+        return 0;
+    }
+    /* Official path: handle matches our libSDL3 mapping */
+    if (sdlHandle != NULL && handle == sdlHandle) {
         return 1;
     }
-    if (originalSdlJniOnLoad == NULL) {
-        LOG_TO_E("SDL_Hook: deferred JNI_OnLoad: original pointer is NULL");
-        return 0;
+    /* Fallback: dladdr — ART LoadNativeLibrary may pass a different handle */
+    Dl_info info;
+    if (dladdr(result, &info) != 0 && info.dli_fname != NULL) {
+        if (strstr(info.dli_fname, "libSDL3.so") != NULL) {
+            return 1;
+        }
     }
-    if (pojav_environ == NULL || pojav_environ->dalvikJavaVMPtr == NULL) {
-        LOG_TO_E("SDL_Hook: deferred JNI_OnLoad: dalvik JavaVM is NULL");
-        return 0;
-    }
-    LOG_TO_I("SDL_Hook: running deferred real JNI_OnLoad on Dalvik vm=%p",
-             (void *) pojav_environ->dalvikJavaVMPtr);
-    jint ver = originalSdlJniOnLoad(pojav_environ->dalvikJavaVMPtr, NULL);
-    sSdlJniOnLoadDone = 1;
-    LOG_TO_I("SDL_Hook: deferred JNI_OnLoad finished, version=0x%x", (unsigned) ver);
-    return 1;
+    return 0;
 }
 
 static void *customDlsym(void *handle, const char *symbol) {
     void *result = BYTEHOOK_CALL_PREV(customDlsym, dlsym_func_t, handle, symbol);
     BYTEHOOK_POP_STACK();
+
     if (sdlHandle == NULL) {
+        /* Prefer already-mapped System.loadLibrary copy (official uses RTLD_LOCAL|NOW) */
         void *noload = dlopen("libSDL3.so", RTLD_NOLOAD);
-        sdlHandle = noload ? noload : dlopen("libSDL3.so", RTLD_NOW);
+        if (noload != NULL) {
+            sdlHandle = noload;
+        } else {
+            sdlHandle = dlopen("libSDL3.so", RTLD_LOCAL | RTLD_NOW);
+        }
     }
-    if (sdlHandle != NULL && handle == sdlHandle && symbol != NULL && strcmp(symbol, "JNI_OnLoad") == 0) {
-        originalSdlJniOnLoad = (jni_on_load_func_t) result;
+
+    if (is_sdl3_jni_onload(handle, symbol, result)) {
+        sdl_set_original_jni_onload(result);
+        LOG_TO_I("SDL_Hook: captured libSDL3 JNI_OnLoad, installing deferred wrapper");
         result = (void *) isolatedSdlJniOnLoad;
-        LOG_TO_I("SDL_Hook: replaced libSDL3 JNI_OnLoad with deferred wrapper");
     }
+
+    /* Official: LWJGL bindings go through dlsym proxies */
     if (result != NULL && symbol != NULL) {
         void *proxy = sdlDlsymProxy(symbol, result);
         if (proxy != NULL) {

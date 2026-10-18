@@ -5,5 +5,3 @@
 void *sdlDlsymProxy(const char *symbol, void *real);
 
 #endif
-
-int run_deferred_sdl_jni_onload(void);

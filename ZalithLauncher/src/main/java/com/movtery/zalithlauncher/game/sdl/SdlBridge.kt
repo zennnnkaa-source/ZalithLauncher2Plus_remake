@@ -132,8 +132,6 @@ object SdlBridge {
     }
 
     @JvmStatic
-    @Synchronized
-    @JvmStatic
     private external fun nativeRunDeferredSdlJniOnLoad(): Boolean
 
     /**
