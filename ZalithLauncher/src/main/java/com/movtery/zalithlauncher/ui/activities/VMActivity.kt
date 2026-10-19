@@ -363,7 +363,7 @@ class VMActivity : BaseAppCompatActivity(), SurfaceTextureListener, SurfaceHolde
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         super.onCreate(savedInstanceState)
         // Do NOT load libSDL3 here. Official loads SDL only from notifyLauncher / prepareSurface
         // after LoggerBridge.start. Early System.loadLibrary can SIGSEGV and kill the process
