@@ -214,6 +214,8 @@ class GameLauncher(
             }
         }
 
+        // MobileGlues/ANGLE reads VULKAN_PTR at init; must be set before dlopen
+        runCatching { ZLBridge.ensureVulkanLoaded() }
         val rendererLib = loadGraphicsLibrary() ?: return
         if (!ZLBridge.dlopen(rendererLib) && !ZLBridge.dlopen(findInLdLibPath(rendererLib))) {
             Logger.error(TAG, "Failed to load renderer $rendererLib")

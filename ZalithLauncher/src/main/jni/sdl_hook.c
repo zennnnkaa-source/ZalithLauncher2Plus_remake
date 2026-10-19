@@ -437,6 +437,20 @@ static void forceEglProfileEs(void) {
     }
 }
 
+/* MobileGlues expects desktop GL; Android SDL defaults may request ES and
+ * push ANGLE/Mali into a stricter GLSL ES path (fragment-output array errors). */
+static void forceDesktopGlProfileForMobileGlues(void) {
+    if (!isMobileGluesEgl()) return;
+    SET_DLSYM_PTR(dlopen("libSDL3.so", RTLD_NOLOAD), SDL_GL_SetAttribute);
+    if (!SDL_GL_SetAttribute_p) return;
+    /* SDL3 GL attr indices match the values already used in this file for ES */
+    SDL_GL_SetAttribute_p(17 /* SDL_GL_CONTEXT_MAJOR_VERSION */, 4);
+    SDL_GL_SetAttribute_p(18 /* SDL_GL_CONTEXT_MINOR_VERSION */, 0);
+    SDL_GL_SetAttribute_p(20 /* SDL_GL_CONTEXT_PROFILE_MASK */, 1 /* CORE */);
+    sForcedEsProfile = false;
+    LOG_TO_I("SDL_Hook: MobileGlues desktop GL profile requested (4.0 CORE)");
+}
+
 // --- Android 单窗口约束下的主窗口复用 ---
 
 // SDL Android 后端同一进程内只支持一个窗口，而 MC 26.3 ss9 起 RenderPearl 在设备
@@ -454,6 +468,7 @@ static SDL_Window *reusePrimaryWindow(void) {
 }
 
 static SDL_Window *custom_SDL_CreateWindow_Func(const char *title, int w, int h, uint32_t flags) {
+    forceDesktopGlProfileForMobileGlues();
     forceEglProfileEs();
     const bool reuse = shouldReusePrimaryWindow();
     LOG_TO_I("SDL_Hook: primary window reuse=%s", reuse ? "enabled" : "disabled");
@@ -471,6 +486,7 @@ static SDL_Window *custom_SDL_CreateWindow_Func(const char *title, int w, int h,
 }
 
 static SDL_Window *custom_SDL_CreateWindowWithProperties_Func(uint32_t props) {
+    forceDesktopGlProfileForMobileGlues();
     forceEglProfileEs();
     const bool reuse = shouldReusePrimaryWindow();
     LOG_TO_I("SDL_Hook: primary window reuse=%s", reuse ? "enabled" : "disabled");
@@ -526,6 +542,7 @@ static bool proxy_SDL_InitSubSystem(SDL_InitFlags flags) {
 }
 
 static SDL_Window *proxy_SDL_CreateWindow(const char *title, int w, int h, uint32_t flags) {
+    forceDesktopGlProfileForMobileGlues();
     forceEglProfileEs();
     if (shouldReusePrimaryWindow() && sPrimaryWindow != NULL) return reusePrimaryWindow();
     SDL_Window *window = realSdlCreateWindow(title, w, h, flags);
@@ -538,6 +555,7 @@ static SDL_Window *proxy_SDL_CreateWindow(const char *title, int w, int h, uint3
 }
 
 static SDL_Window *proxy_SDL_CreateWindowWithProperties(uint32_t props) {
+    forceDesktopGlProfileForMobileGlues();
     forceEglProfileEs();
     if (shouldReusePrimaryWindow() && sPrimaryWindow != NULL) return reusePrimaryWindow();
     SDL_Window *window = realSdlCreateWindowWithProperties(props);

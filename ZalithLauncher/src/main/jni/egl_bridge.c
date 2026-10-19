@@ -129,6 +129,16 @@ int pojavInitOpenGL() {
             setenv("GALLIUM_DRIVER", "zink", 1);
             setenv("MESA_ANDROID_NO_KMS_SWRAST", "1", 1);
         }
+        /* MobileGlues + ANGLE needs VULKAN_PTR before ANGLE shader compiler runs */
+        {
+            const char *exec_egl = getenv("POJAVEXEC_EGL");
+            if (exec_egl != NULL && strstr(exec_egl, "mobileglues") != NULL) {
+                if (getenv("VULKAN_PTR") == NULL) load_vulkan();
+            }
+        }
+        if (!strcmp(renderer, "mobileglues") && getenv("VULKAN_PTR") == NULL) {
+            load_vulkan();
+        }
         set_gl_bridge_tbl();
     }
 
@@ -297,6 +307,16 @@ Java_org_lwjgl_vulkan_VK_onVKFrame(ABI_COMPAT JNIEnv *env, ABI_COMPAT jclass thi
 EXTERNAL_API JNIEXPORT jint JNICALL
 Java_org_lwjgl_glfw_CallbackBridge_getCurrentFps(JNIEnv *env, jclass clazz) {
     return fps;
+}
+
+EXTERNAL_API JNIEXPORT void JNICALL
+Java_com_movtery_zalithlauncher_bridge_ZLBridge_ensureVulkanLoaded(ABI_COMPAT JNIEnv *env, ABI_COMPAT jclass clazz) {
+    if (getenv("VULKAN_PTR") == NULL) {
+        printf("EGLBridge: ensureVulkanLoaded — loading Vulkan for MobileGlues/ANGLE\n");
+        load_vulkan();
+    } else {
+        printf("EGLBridge: ensureVulkanLoaded — VULKAN_PTR already set\n");
+    }
 }
 
 EXTERNAL_API JNIEXPORT jlong JNICALL

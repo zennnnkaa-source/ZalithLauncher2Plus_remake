@@ -68,6 +68,7 @@ public final class ZLBridge {
 
     //Render
     @Keep public static native void setupBridgeWindow(Object surface);
+    @Keep public static native void ensureVulkanLoaded();
     @Keep public static native void releaseBridgeWindow();
     @Keep public static native void moveWindow(int xOffset, int yOffset);
     @Keep public static native int[] renderAWTScreenFrame();
