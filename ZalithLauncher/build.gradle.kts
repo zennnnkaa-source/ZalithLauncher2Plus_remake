@@ -116,7 +116,14 @@ android {
     packaging {
         jniLibs {
             useLegacyPackaging = true
-            pickFirsts += listOf("**/libbytehook.so")
+            // Prefer single SDL binary from libs/SDL-release.aar (matches official).
+            // Do not ship a second libSDL3.so via src/main/jniLibs — wrong build
+            // SIGSEGVs in JNI_OnLoad/FindClass on some devices (ZTE/Unisoc).
+            pickFirsts += listOf(
+                "**/libbytehook.so",
+                "**/libSDL3.so",
+                "**/libSDL2.so",
+            )
         }
     }
 
