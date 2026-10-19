@@ -123,6 +123,9 @@ android {
                 "**/libbytehook.so",
                 "**/libSDL3.so",
                 "**/libSDL2.so",
+                // Prefer 3.4.1 libshaderc (has shaderc_compile_options_set_max_id_bound)
+                // over older lwjgl3-natives copy that MC 26.3 rejects.
+                "**/libshaderc.so",
             )
         }
     }

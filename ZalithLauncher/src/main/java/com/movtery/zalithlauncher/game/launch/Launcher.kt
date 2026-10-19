@@ -287,6 +287,10 @@ abstract class Launcher(
         // Our spirv-cross is compiled shared, so it gets named shared.
         args.add("-Dorg.lwjgl.spvc.libname=spirv-cross-c-shared")
 
+        // MC 26.3 RenderPearl needs shaderc_compile_options_set_max_id_bound.
+        // Force the 3.4.1 libshaderc from the APK native dir (not an old extract/cache).
+        args.add("-Dorg.lwjgl.shaderc.libname=${PathManager.DIR_NATIVE_LIB}/libshaderc.so")
+
         // We don't have jemalloc for our LWJGL so set the allocator to system to avoid error logs
         args.add("-Dorg.lwjgl.system.allocator=system")
 
