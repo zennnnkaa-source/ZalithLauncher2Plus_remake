@@ -51,7 +51,8 @@ sealed interface PerformanceSettingsOperation {
 @Composable
 fun PerformanceSettingsDialog(
     operation: PerformanceSettingsOperation,
-    onDismissRequest: () -> Unit
+    onDismissRequest: () -> Unit,
+    onRefreshWindowSize: () -> Unit = {}
 ) {
     when (operation) {
         PerformanceSettingsOperation.None -> {}
@@ -71,14 +72,56 @@ fun PerformanceSettingsDialog(
                     title = stringResource(R.string.settings_renderer_resolution_scale_title),
                     value = AllSettings.resolutionRatio.state.toFloat(),
                     onValueChange = { AllSettings.resolutionRatio.updateState(it.toInt()) },
-                    onValueChangeFinished = { AllSettings.resolutionRatio.save() },
+                    onValueChangeFinished = {
+                        AllSettings.resolutionRatio.save()
+                        onRefreshWindowSize()
+                    },
                     valueRange = 25f..300f,
                     decimalFormat = "#0",
                     suffix = "%",
                     fineTuningStep = 1f
                 )
 
+                InfoLayoutSwitchItem(
+                    modifier = Modifier.fillMaxWidth(),
+                    title = stringResource(R.string.settings_renderer_custom_resolution_title),
+                    value = AllSettings.customResolutionEnabled.state,
+                    onValueChange = {
+                        AllSettings.customResolutionEnabled.save(it)
+                        onRefreshWindowSize()
+                    }
+                )
 
+                if (AllSettings.customResolutionEnabled.state) {
+                    InfoLayoutSliderItem(
+                        modifier = Modifier.fillMaxWidth(),
+                        title = stringResource(R.string.settings_renderer_custom_resolution_width),
+                        value = AllSettings.customResolutionWidth.state.toFloat(),
+                        onValueChange = { AllSettings.customResolutionWidth.updateState(it.toInt()) },
+                        onValueChangeFinished = {
+                            AllSettings.customResolutionWidth.save()
+                            onRefreshWindowSize()
+                        },
+                        valueRange = 320f..3840f,
+                        decimalFormat = "#0",
+                        suffix = "px",
+                        fineTuningStep = 10f
+                    )
+                    InfoLayoutSliderItem(
+                        modifier = Modifier.fillMaxWidth(),
+                        title = stringResource(R.string.settings_renderer_custom_resolution_height),
+                        value = AllSettings.customResolutionHeight.state.toFloat(),
+                        onValueChange = { AllSettings.customResolutionHeight.updateState(it.toInt()) },
+                        onValueChangeFinished = {
+                            AllSettings.customResolutionHeight.save()
+                            onRefreshWindowSize()
+                        },
+                        valueRange = 240f..2160f,
+                        decimalFormat = "#0",
+                        suffix = "px",
+                        fineTuningStep = 10f
+                    )
+                }
             }
         }
         PerformanceSettingsOperation.Ram -> {

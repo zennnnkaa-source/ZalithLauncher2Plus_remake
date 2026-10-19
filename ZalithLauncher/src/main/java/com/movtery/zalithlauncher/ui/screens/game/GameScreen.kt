@@ -555,7 +555,8 @@ fun GameScreen(
 
     PerformanceSettingsDialog(
         operation = viewModel.performanceSettingsState,
-        onDismissRequest = { viewModel.performanceSettingsState = PerformanceSettingsOperation.None }
+        onDismissRequest = { viewModel.performanceSettingsState = PerformanceSettingsOperation.None },
+        onRefreshWindowSize = { eventViewModel.sendEvent(EventViewModel.Event.Game.RefreshSize) }
     )
 
     TerracottaOperation(

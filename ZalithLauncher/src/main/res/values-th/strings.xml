@@ -370,4 +370,10 @@
     <string name="game_menu_option_menu_ball_opacity">ความโปร่งใสของปุ่มเมนูหลัก</string>
     <string name="game_menu_option_send_keycode">ส่งรหัสปุ่ม</string>
     <string name="game_menu_option_replacement_control">แทนที่ชุดปุ่มควบคุม</string>
+
+    <string name="settings_renderer_custom_resolution_title">ความละเอียดกำหนดเอง</string>
+    <string name="settings_renderer_custom_resolution_summary">ขนาดฐานเป็นพิกเซล (แบบ official) ใช้คู่กับสเกลเรนเดอร์ได้ ปิด = ใช้ขนาดจอเป็นฐาน</string>
+    <string name="settings_renderer_custom_resolution_width">ความกว้าง (px)</string>
+    <string name="settings_renderer_custom_resolution_height">ความสูง (px)</string>
+    <string name="settings_renderer_current_resolution">ขนาดเรนเดอร์ปัจจุบัน: %1$d × %2$d</string>
 </resources>

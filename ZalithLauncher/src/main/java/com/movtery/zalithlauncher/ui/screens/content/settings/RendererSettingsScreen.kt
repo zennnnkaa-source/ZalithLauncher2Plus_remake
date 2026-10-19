@@ -360,6 +360,37 @@ fun RendererSettingsScreen(
 
                     SwitchSettingsCard(
                         modifier = Modifier.fillMaxWidth(),
+                        position = CardPosition.Middle,
+                        unit = AllSettings.customResolutionEnabled,
+                        title = stringResource(R.string.settings_renderer_custom_resolution_title),
+                        summary = stringResource(R.string.settings_renderer_custom_resolution_summary)
+                    )
+
+                    if (AllSettings.customResolutionEnabled.state) {
+                        IntSliderSettingsCard(
+                            modifier = Modifier.fillMaxWidth(),
+                            position = CardPosition.Middle,
+                            unit = AllSettings.customResolutionWidth,
+                            title = stringResource(R.string.settings_renderer_custom_resolution_width),
+                            summary = stringResource(R.string.settings_renderer_custom_resolution_summary),
+                            valueRange = AllSettings.customResolutionWidth.floatRange,
+                            suffix = "px",
+                            fineTuningControl = true
+                        )
+                        IntSliderSettingsCard(
+                            modifier = Modifier.fillMaxWidth(),
+                            position = CardPosition.Middle,
+                            unit = AllSettings.customResolutionHeight,
+                            title = stringResource(R.string.settings_renderer_custom_resolution_height),
+                            summary = stringResource(R.string.settings_renderer_custom_resolution_summary),
+                            valueRange = AllSettings.customResolutionHeight.floatRange,
+                            suffix = "px",
+                            fineTuningControl = true
+                        )
+                    }
+
+                    SwitchSettingsCard(
+                        modifier = Modifier.fillMaxWidth(),
                         position = CardPosition.Bottom,
                         unit = AllSettings.gameFullScreen,
                         title = stringResource(R.string.settings_renderer_full_screen_title),

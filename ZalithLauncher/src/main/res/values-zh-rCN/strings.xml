@@ -1071,8 +1071,14 @@
     <string name="settings_renderer_env_title">环境变量：%s</string>
     <string name="settings_renderer_config_title">渲染器配置</string>
     <string name="settings_renderer_from_plugins">来自 %s 插件</string>
-    <string name="settings_renderer_resolution_scale_title">分辨率缩放</string>
-    <string name="settings_renderer_resolution_scale_summary">较低的值可提高性能，较高的值可增强图形质量。根据需要调整</string>
+    <string name="settings_renderer_resolution_scale_title">渲染缩放</string>
+    <string name="settings_renderer_resolution_scale_summary">在基础尺寸（屏幕或自定义宽高）上再缩放画质。越低越流畅。100% = 使用完整基础尺寸</string>
+
+    <string name="settings_renderer_custom_resolution_title">自定义分辨率</string>
+    <string name="settings_renderer_custom_resolution_summary">基础显示尺寸（像素，与官方一致），可与渲染缩放同时使用。关闭 = 以全屏为基准</string>
+    <string name="settings_renderer_custom_resolution_width">宽度 (px)</string>
+    <string name="settings_renderer_custom_resolution_height">高度 (px)</string>
+    <string name="settings_renderer_current_resolution">当前渲染尺寸：%1$d × %2$d</string>
     <string name="settings_renderer_full_screen_title">游戏全屏</string>
     <string name="settings_renderer_full_screen_summary">启用全屏模式，忽略刘海屏、挖孔屏等安全区域</string>
     <string name="settings_renderer_sustained_performance_title">持续性能模式</string>

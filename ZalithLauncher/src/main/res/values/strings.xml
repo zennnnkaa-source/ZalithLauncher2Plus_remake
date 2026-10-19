@@ -1066,8 +1066,14 @@
     <string name="settings_renderer_env_title">Environment Variable: %s</string>
     <string name="settings_renderer_config_title">Renderer Configuration</string>
     <string name="settings_renderer_from_plugins">From %s plugin</string>
-    <string name="settings_renderer_resolution_scale_title">Resolution Scale</string>
-    <string name="settings_renderer_resolution_scale_summary">Lower values improve performance; higher values enhance graphics quality. Adjust according to your needs</string>
+    <string name="settings_renderer_resolution_scale_title">Render Scale</string>
+    <string name="settings_renderer_resolution_scale_summary">Render quality scale applied on top of base size (screen or custom W×H). Lower = smoother FPS. 100% = full base size</string>
+
+    <string name="settings_renderer_custom_resolution_title">Custom resolution</string>
+    <string name="settings_renderer_custom_resolution_summary">Base display size in pixels (like official). Can be combined with Render Scale. Off = use full screen as base</string>
+    <string name="settings_renderer_custom_resolution_width">Width (px)</string>
+    <string name="settings_renderer_custom_resolution_height">Height (px)</string>
+    <string name="settings_renderer_current_resolution">Current render size: %1$d × %2$d</string>
     <string name="settings_renderer_full_screen_title">Game Fullscreen</string>
     <string name="settings_renderer_full_screen_summary">Enable fullscreen mode, ignoring safe areas like notches and punch-holes</string>
     <string name="settings_renderer_sustained_performance_title">Sustained Performance Mode</string>

@@ -67,9 +67,25 @@ object AllSettings : SettingsRegistry() {
     val graphicsApi = enumSetting("graphicsApi", GraphicsApi.DEFAULT_OPENGL)
 
     /**
-     * 分辨率
+     * 渲染分辨率缩放（%）：相对屏幕物理尺寸。降低可提升帧率，提高可增强画质。
+     * 默认 100 = 与屏幕一致。
      */
-    val resolutionRatio = intSetting("resolutionRatio", 70, 25..300)
+    val resolutionRatio = intSetting("resolutionRatio", 100, 25..300)
+
+    /**
+     * 使用自定义渲染分辨率（宽x高像素），关闭时按屏幕尺寸 × resolutionRatio 自动适配。
+     */
+    val customResolutionEnabled = boolSetting("customResolutionEnabled", false)
+
+    /**
+     * 自定义渲染宽度（像素），仅 customResolutionEnabled 时生效。
+     */
+    val customResolutionWidth = intSetting("customResolutionWidth", 1280, 320..7680)
+
+    /**
+     * 自定义渲染高度（像素），仅 customResolutionEnabled 时生效。
+     */
+    val customResolutionHeight = intSetting("customResolutionHeight", 720, 240..4320)
 
     /**
      * 游戏页面全屏化

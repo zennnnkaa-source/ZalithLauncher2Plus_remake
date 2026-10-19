@@ -347,7 +347,7 @@ private fun GameActionContent(
                 enabled = AllSettings.showMenuBall.state
             )
         }
-        //游戏窗口分辨率
+        // 渲染缩放：降低像素以提升帧率；100% = พอดีจอ
         item {
             MenuSliderLayout(
                 modifier = Modifier.fillMaxWidth(),
@@ -356,7 +356,6 @@ private fun GameActionContent(
                 valueRange = AllSettings.resolutionRatio.floatRange,
                 onValueChange = { value ->
                     AllSettings.resolutionRatio.updateState(value)
-//                        onRefreshWindowSize()
                 },
                 onValueChangeFinished = { value ->
                     AllSettings.resolutionRatio.save(value)
@@ -366,6 +365,54 @@ private fun GameActionContent(
                 color = color,
                 contentColor = contentColor,
             )
+        }
+        // 自定义分辨率（官方风格 宽x高）— 可与渲染缩放同时使用
+        item {
+            MenuSwitchButton(
+                modifier = Modifier.fillMaxWidth(),
+                text = stringResource(R.string.settings_renderer_custom_resolution_title),
+                switch = AllSettings.customResolutionEnabled.state,
+                onSwitch = {
+                    AllSettings.customResolutionEnabled.save(it)
+                    onRefreshWindowSize()
+                },
+                color = color,
+                contentColor = contentColor,
+            )
+        }
+        if (AllSettings.customResolutionEnabled.state) {
+            item {
+                MenuSliderLayout(
+                    modifier = Modifier.fillMaxWidth(),
+                    title = stringResource(R.string.settings_renderer_custom_resolution_width),
+                    value = AllSettings.customResolutionWidth.state,
+                    valueRange = AllSettings.customResolutionWidth.floatRange,
+                    onValueChange = { AllSettings.customResolutionWidth.updateState(it) },
+                    onValueChangeFinished = {
+                        AllSettings.customResolutionWidth.save(it)
+                        onRefreshWindowSize()
+                    },
+                    suffix = "px",
+                    color = color,
+                    contentColor = contentColor,
+                )
+            }
+            item {
+                MenuSliderLayout(
+                    modifier = Modifier.fillMaxWidth(),
+                    title = stringResource(R.string.settings_renderer_custom_resolution_height),
+                    value = AllSettings.customResolutionHeight.state,
+                    valueRange = AllSettings.customResolutionHeight.floatRange,
+                    onValueChange = { AllSettings.customResolutionHeight.updateState(it) },
+                    onValueChangeFinished = {
+                        AllSettings.customResolutionHeight.save(it)
+                        onRefreshWindowSize()
+                    },
+                    suffix = "px",
+                    color = color,
+                    contentColor = contentColor,
+                )
+            }
         }
     }
 }

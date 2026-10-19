@@ -221,6 +221,45 @@ fun getDisplayFriendlyRes(displaySideRes: Int, scaling: Float): Int {
     return display
 }
 
+
+/**
+ * Compute the game render resolution.
+ * - Custom mode: fixed width x height (even numbers)
+ * - Auto mode: physical screen size scaled by resolutionRatio%
+ * Lower resolution = fewer pixels = higher FPS.
+ */
+/**
+ * Final render size = base size × (render scale %).
+ *
+ * Base size:
+ * - Custom ON  → fixed width × height (display/window size)
+ * - Custom OFF → physical screen size (auto-fit)
+ *
+ * Render scale % always applies on top of the base (both can be used together):
+ * - 100% = full base resolution
+ * - 50%  = half the pixels → smoother FPS
+ */
+fun computeGameResolution(screenWidth: Int, screenHeight: Int): Pair<Int, Int> {
+    val settings = com.movtery.zalithlauncher.setting.AllSettings
+    val baseW: Int
+    val baseH: Int
+    if (settings.customResolutionEnabled.getValue()) {
+        baseW = settings.customResolutionWidth.getValue().coerceIn(320, 7680)
+        baseH = settings.customResolutionHeight.getValue().coerceIn(240, 4320)
+    } else {
+        baseW = screenWidth
+        baseH = screenHeight
+    }
+    val scale = settings.resolutionRatio.getValue().toFloat() / 100f
+    var w = getDisplayFriendlyRes(baseW, scale)
+    var h = getDisplayFriendlyRes(baseH, scale)
+    // Keep a usable minimum so the game does not collapse to a few pixels
+    if (w < 320) w = 320
+    if (h < 240) h = 240
+    return w to h
+}
+
+
 fun isAdrenoGPU(): Boolean {
     val eglDisplay = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY)
     if (eglDisplay == EGL14.EGL_NO_DISPLAY) {

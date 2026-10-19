@@ -103,6 +103,7 @@ import com.movtery.zalithlauncher.ui.screens.game.elements.OpenFolderOperation
 import com.movtery.zalithlauncher.ui.theme.ZalithLauncherTheme
 import com.movtery.zalithlauncher.utils.device.PhysicalMouseChecker
 import com.movtery.zalithlauncher.utils.getDisplayFriendlyRes
+import com.movtery.zalithlauncher.utils.computeGameResolution
 import com.movtery.zalithlauncher.utils.getParcelableSafely
 import com.movtery.zalithlauncher.viewmodel.ErrorViewModel
 import com.movtery.zalithlauncher.viewmodel.EventViewModel
@@ -577,17 +578,17 @@ class VMActivity : BaseAppCompatActivity(), SurfaceTextureListener, SurfaceHolde
     private fun refreshWindowSize(
         screenSize: IntSize
     ): IntSize {
-        fun getDisplayPixels(pixels: Int): Int {
-            return withHandler {
-                when (type) {
-                    HandlerType.GAME -> getDisplayFriendlyRes(pixels, AllSettings.resolutionRatio.getValue().toFloat() / 100f)
-                    HandlerType.JVM -> getDisplayFriendlyRes(pixels, 0.8f)
+        val (windowWidth, windowHeight) = withHandler {
+            when (type) {
+                HandlerType.GAME -> {
+                    val (w, h) = computeGameResolution(screenSize.width, screenSize.height)
+                    w to h
+                }
+                HandlerType.JVM -> {
+                    getDisplayFriendlyRes(screenSize.width, 0.8f) to getDisplayFriendlyRes(screenSize.height, 0.8f)
                 }
             }
         }
-
-        val windowWidth = getDisplayPixels(screenSize.width)
-        val windowHeight = getDisplayPixels(screenSize.height)
         applySizeToSurface?.invoke(windowWidth, windowHeight)
         ZLBridgeStates.onWindowChange()
         CallbackBridge.sendUpdateWindowSize(windowWidth, windowHeight)
