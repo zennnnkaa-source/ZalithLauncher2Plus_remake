@@ -309,7 +309,7 @@ Java_org_lwjgl_glfw_CallbackBridge_getCurrentFps(JNIEnv *env, jclass clazz) {
     return fps;
 }
 
-EXTERNAL_API JNIEXPORT void JNICALL
+EXTERNAL_API JNIEXPORT jstring JNICALL
 Java_com_movtery_zalithlauncher_bridge_ZLBridge_ensureVulkanLoaded(ABI_COMPAT JNIEnv *env, ABI_COMPAT jclass clazz) {
     if (getenv("VULKAN_PTR") == NULL) {
         printf("EGLBridge: ensureVulkanLoaded — loading Vulkan for MobileGlues/ANGLE\n");
@@ -317,6 +317,13 @@ Java_com_movtery_zalithlauncher_bridge_ZLBridge_ensureVulkanLoaded(ABI_COMPAT JN
     } else {
         printf("EGLBridge: ensureVulkanLoaded — VULKAN_PTR already set\n");
     }
+    const char *val = getenv("VULKAN_PTR");
+    if (val == NULL || val[0] == '\0') {
+        printf("EGLBridge: ensureVulkanLoaded — WARNING getenv(VULKAN_PTR) still empty after load\n");
+        return NULL;
+    }
+    printf("EGLBridge: ensureVulkanLoaded — VULKAN_PTR=%s\n", val);
+    return (*env)->NewStringUTF(env, val);
 }
 
 EXTERNAL_API JNIEXPORT jlong JNICALL

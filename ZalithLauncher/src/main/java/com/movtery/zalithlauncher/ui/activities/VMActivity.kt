@@ -557,6 +557,8 @@ class VMActivity : BaseAppCompatActivity(), SurfaceTextureListener, SurfaceHolde
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
+        // Keep landscape even if system/SDL tries to flip to portrait
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         vmViewModel.onConfigurationChanged()
     }
 

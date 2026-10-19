@@ -438,6 +438,17 @@ abstract class Launcher(
 
             map["ALSOFT_DRIVERS"] = "opensl,aaudio"
             map["ALSOFT_DISABLE_EVENTS"] = "1"
+
+            // MobileGlues/ANGLE reads VULKAN_PTR via getenv in the same process.
+            // Must be in the Os.setenv map (not only native setenv) so ART + JVM agree.
+            runCatching {
+                val ptr = ZLBridge.ensureVulkanLoaded()
+                if (!ptr.isNullOrBlank()) {
+                    map["VULKAN_PTR"] = ptr
+                }
+            }.onFailure {
+                Logger.error(TAG, "ensureVulkanLoaded failed", it)
+            }
         }
     }
 
