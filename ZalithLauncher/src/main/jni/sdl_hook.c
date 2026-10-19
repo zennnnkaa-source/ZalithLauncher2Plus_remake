@@ -187,13 +187,19 @@ static bool isMobileGluesEgl(void) {
 // GLES 兼容层（强制 ES profile、RENDERABLE_TYPE 归一化、CV=2 兜底）
 // 仅对移动 ES 渲染器生效，桌面/OSMesa 路径不得被 ES 化
 static bool sdlGlesCompatEnabled(void) {
+    /* MobileGlues presents desktop GL (via ANGLE/Vulkan). ES-normalizing the
+     * EGL context (strip KHR version, force CLIENT_VERSION) breaks Mali/ANGLE
+     * GLSL compilation for MC 26.3 (fragment output array index errors).
+     * Official path leaves MobileGlues context attributes alone. */
+    if (isMobileGluesEgl()) return false;
+
     const char *renderer = getenv("POJAV_RENDERER");
-    if (renderer == NULL) return isMobileGluesEgl();
+    if (renderer == NULL) return false;
     if (strstr(renderer, "desktopgl") != NULL) return false;
     if (strncmp(renderer, "gallium_", 8) == 0) return false; // OSMesa 系
     if (strcmp(renderer, "custom_gallium") == 0 || strcmp(renderer, "vulkan_zink") == 0) return false;
     if (strncmp(renderer, "opengles", 8) == 0) return true; // 内置 GL4ES/NGGL4ES
-    return isMobileGluesEgl(); // MobileGlues
+    return false;
 }
 
 static bool sForcedEsProfile = false;
