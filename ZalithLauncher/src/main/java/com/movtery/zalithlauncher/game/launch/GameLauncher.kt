@@ -55,6 +55,7 @@ import com.movtery.zalithlauncher.path.PathManager
 import com.movtery.zalithlauncher.setting.AllSettings
 import com.movtery.zalithlauncher.utils.GSON
 import com.movtery.zalithlauncher.utils.device.Architecture
+import com.movtery.zalithlauncher.game.version.download.usesLwjglSdl
 import com.movtery.zalithlauncher.utils.file.child
 import com.movtery.zalithlauncher.utils.file.ensureDirectorySilently
 import com.movtery.zalithlauncher.utils.logging.Logger
@@ -136,6 +137,10 @@ class GameLauncher(
             javaArguments = customArgs.takeIf { it.isNotEmpty() } ?: "NONE",
             javaRuntime = javaRuntime,
         )
+
+        // Official: ensure LWJGL 3.4.1 natives (liblwjgl.so) are unpacked before JVM start
+        val lwjglVer = if (gameManifest.libraries.usesLwjglSdl()) 341 else 333
+        initLwjglComponent(activity, lwjglVer)
 
         return launchGame(
             screenSize = screenSize,

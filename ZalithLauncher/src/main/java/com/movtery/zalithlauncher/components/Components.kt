@@ -20,12 +20,21 @@ package com.movtery.zalithlauncher.components
 
 import com.movtery.zalithlauncher.R
 
-enum class Components(val component: String, val displayName: String, val summary: Int) {
-    AUTH_LIBS("auth_libs", "authlib-injector", R.string.unpack_screen_authlib_injector),
-    CACIOCAVALLO("caciocavallo", "caciocavallo", R.string.unpack_screen_cacio),
-    CACIOCAVALLO17("caciocavallo17", "caciocavallo 17", R.string.unpack_screen_cacio),
-    LWJGL3("lwjgl3", "LWJGL 3.3.6", R.string.unpack_screen_lwjgl),
-    /** Official Android LWJGL 3.4.1 (SDL in merged-modules) for Minecraft 26.3+ */
-    LWJGL341("lwjgl/3.4.1", "LWJGL 3.4.1", R.string.unpack_screen_lwjgl),
-    LAUNCHER("launcher", "Launcher Components", R.string.unpack_screen_launcher)
+enum class Components(
+    val component: String,
+    val displayName: String,
+    val summary: Int,
+    /** Asset path under APK assets/ (official uses app_runtime for LWJGL so AAR natives are included) */
+    val assetsDir: String
+) {
+    AUTH_LIBS("auth_libs", "authlib-injector", R.string.unpack_screen_authlib_injector, "components/auth_libs"),
+    CACIOCAVALLO("caciocavallo", "caciocavallo", R.string.unpack_screen_cacio, "components/caciocavallo"),
+    CACIOCAVALLO17("caciocavallo17", "caciocavallo 17", R.string.unpack_screen_cacio, "components/caciocavallo17"),
+    LWJGL3("lwjgl3", "LWJGL 3.3.6", R.string.unpack_screen_lwjgl, "components/lwjgl3"),
+    /**
+     * Official Android LWJGL 3.4.1. Natives ship inside libs/lwjgl-3.4.1-natives-release.aar
+     * under assets/app_runtime/lwjgl/3.4.1/natives/<abi>/.
+     */
+    LWJGL341("lwjgl/3.4.1", "LWJGL 3.4.1", R.string.unpack_screen_lwjgl, "components/lwjgl/3.4.1"),
+    LAUNCHER("launcher", "Launcher Components", R.string.unpack_screen_launcher, "components/launcher")
 }

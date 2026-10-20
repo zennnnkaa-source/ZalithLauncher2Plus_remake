@@ -251,13 +251,11 @@ class LaunchArgs(
         // with the same MobileGlues shader errors.
         argsList.add("-Dorg.lwjgl.vulkan.libname=libvulkan.so")
         // Prefer LWJGL 3.4.1 natives from components (same order as official log).
-        val lwjglNatives = File(PathManager.DIR_COMPONENTS, "lwjgl/3.4.1/natives/arm64-v8a")
-            .takeIf { it.isDirectory }
-            ?: File(PathManager.DIR_COMPONENTS, "lwjgl3/natives")
-                .takeIf { it.isDirectory }
-        argsList.add(
-            "-Dorg.lwjgl.librarypath=${lwjglNatives?.absolutePath ?: PathManager.DIR_NATIVE_LIB}"
-        )
+        // Prefer component natives; fall back to APK lib dir only if unpack has not run yet
+        val lwjglNativesDir = File(PathManager.DIR_COMPONENTS, "lwjgl/3.4.1/natives/arm64-v8a").let { d ->
+            if (File(d, "liblwjgl.so").isFile) d.absolutePath else PathManager.DIR_NATIVE_LIB
+        }
+        argsList.add("-Dorg.lwjgl.librarypath=$lwjglNativesDir")
         argsList.add("-Dorg.lwjgl.sdl.libname=SDL3")
 
         return argsList

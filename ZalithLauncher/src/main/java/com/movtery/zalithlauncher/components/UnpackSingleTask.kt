@@ -26,6 +26,7 @@ import com.movtery.zalithlauncher.utils.logging.Logger
 import org.apache.commons.io.FileUtils
 import java.io.File
 import java.io.FileInputStream
+import java.io.IOException
 import java.io.InputStream
 
 private const val TAG = "UnpackSingleTask"
@@ -45,9 +46,10 @@ abstract class UnpackSingleTask(
         runCatching {
             am = context.assets
             versionFile = File("$rootDir/$fileDirName/version")
-            input = am.open("$assetsDirName/$fileDirName/version")
+            // assetsDirName is the full asset path (e.g. app_runtime/lwjgl/3.4.1 or components/launcher)
+            input = am.open("$assetsDirName/version")
         }.onFailure { e ->
-            Logger.warning(TAG, "Failed to init asset version. assetsPath=$assetsDirName/$fileDirName/version", e)
+            Logger.warning(TAG, "Failed to init asset version. assetsPath=$assetsDirName/version", e)
             isCheckFailed = true
         }
     }
@@ -76,7 +78,6 @@ abstract class UnpackSingleTask(
             }.onFailure { e ->
                 Logger.error("CheckComponent", "An exception occurred while detecting the assets resource.", e)
             }.getOrElse {
-                //检查失败，要求重新进行安装
                 InstallableItem.State.NOT_STARTED
             }
         }
@@ -86,30 +87,43 @@ abstract class UnpackSingleTask(
         val dir = File(rootDir, fileDirName)
         FileUtils.deleteDirectory(dir)
 
-        val fileList = am.list("$assetsDirName/$fileDirName")!!
-            .map { fileName -> File(dir, fileName) }
-        val versionFile = fileList.find { it.name == "version" }!!
+        // Recursive copy so nested natives/<abi>/*.so are installed (official behaviour)
+        copyAssetDirectory(assetsDirName, dir)
 
-        for (file in fileList) {
-            context.copyAssetFile(
-                fileName = "$assetsDirName/$fileDirName/${file.name}",
-                output = file,
-                overwrite = true
-            )
-            moreProgress(file)
-        }
-
-        //最后才写入version
         context.copyAssetFile(
-            fileName = "$assetsDirName/$fileDirName/version",
-            output = versionFile,
+            fileName = "$assetsDirName/version",
+            output = File(dir, "version"),
             overwrite = true
         )
+        val fileCount = dir.walkTopDown().count { it.isFile }
+        Logger.info(TAG, "$fileDirName: unpacked $fileCount files")
     }
 
-    /**
-     * 执行更多操作
-     */
+    private suspend fun copyAssetDirectory(assetPath: String, outputDir: File) {
+        outputDir.mkdirs()
+        val children = am.list(assetPath) ?: emptyArray()
+        Logger.debug(TAG, "copyAssetDirectory: $assetPath (${children.size} entries)")
+        children.forEach { child ->
+            val childAssetPath = "$assetPath/$child"
+            val childOutput = File(outputDir, child)
+            if (isAssetDirectory(childAssetPath)) {
+                copyAssetDirectory(childAssetPath, childOutput)
+            } else {
+                context.copyAssetFile(childAssetPath, childOutput, overwrite = true)
+                moreProgress(childOutput)
+            }
+        }
+    }
+
+    private fun isAssetDirectory(assetPath: String): Boolean {
+        return try {
+            am.open(assetPath).close()
+            false
+        } catch (_: IOException) {
+            true
+        }
+    }
+
     open suspend fun moreProgress(file: File) {}
 
     private fun requestEmptyParentDir(file: File) {

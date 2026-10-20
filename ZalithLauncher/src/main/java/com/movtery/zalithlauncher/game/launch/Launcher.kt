@@ -18,6 +18,14 @@
 
 package com.movtery.zalithlauncher.game.launch
 
+import kotlinx.coroutines.withContext
+
+import kotlinx.coroutines.Dispatchers
+
+import com.movtery.zalithlauncher.components.UnpackComponentsTask
+
+import com.movtery.zalithlauncher.components.Components
+
 import android.content.Context
 import android.os.Build
 import android.os.LocaleList
@@ -181,6 +189,9 @@ abstract class Launcher(
             // Default OFF: loading system libvulkan.so triggers SIGSEGV in libpojavexec JNI_OnLoad
             // on this Android stack when Minecraft 26.3 calls NativeLibrariesBootstrap.tryLoadingVulkan()
             put("org.lwjgl.vulkan.libname", "libvulkan.so")
+            if (this::lwjglNativesDir.isInitialized) {
+                put("org.lwjgl.librarypath", lwjglNativesDir)
+            }
             put("glfwstub.windowWidth", screenSize.width.toString())
             put("glfwstub.windowHeight", screenSize.height.toString())
             put("glfwstub.initEgl", "false")
@@ -352,15 +363,79 @@ abstract class Launcher(
         return paths.joinToString(":")
     }
 
+
+    // --- Official-style LWJGL component natives (liblwjgl.so etc.) ---
+    private var lwjglVersion: Int = 341
+    protected lateinit var lwjglNativesDir: String
+
+    private fun lwjglVersionDir(version: Int): String =
+        if (version >= 341) "3.4.1" else "3.3.3"
+
+    /**
+     * Resolve and ensure LWJGL natives under components/lwjgl/<ver>/natives/<abi>/.
+     * Official does this before every launch; Plus previously skipped it so
+     * org.lwjgl.librarypath fell back to APK lib/arm64 (no liblwjgl.so).
+     */
+    protected suspend fun initLwjglComponent(context: android.content.Context, version: Int) {
+        if (this::lwjglNativesDir.isInitialized) return
+        lwjglVersion = version
+        val abi = Architecture.archAsStringAndroid(Architecture.getDeviceArchitecture())
+        lwjglNativesDir = File(
+            PathManager.DIR_COMPONENTS,
+            "lwjgl/${lwjglVersionDir(version)}/natives/$abi"
+        ).absolutePath
+        verifyLwjglNatives(context)
+    }
+
+    private suspend fun verifyLwjglNatives(context: android.content.Context) {
+        val versionDir = lwjglVersionDir(lwjglVersion)
+        val coreLib = File(lwjglNativesDir, "liblwjgl.so")
+        if (coreLib.isFile) {
+            LoggerBridge.append("LWJGL: LWJGL $versionDir natives check passed: path=$lwjglNativesDir (liblwjgl.so found)")
+            return
+        }
+        LoggerBridge.append("LWJGL: natives missing at $lwjglNativesDir — unpacking component + copying AAR natives")
+
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val component = Components.entries.firstOrNull {
+                    it.component == "lwjgl/$versionDir"
+                } ?: error("Unrecognized LWJGL component: lwjgl/$versionDir")
+                UnpackComponentsTask(context, component).run()
+            }.onFailure { e ->
+                LoggerBridge.append("LWJGL: component unpack failed: ${e.message}")
+            }
+            // AAR ships natives under assets/app_runtime/lwjgl/<ver>/natives/<abi>/
+            // while component jars live under components/lwjgl/<ver>/. Merge natives in.
+            runCatching {
+                val abi = Architecture.archAsStringAndroid(Architecture.getDeviceArchitecture())
+                val assetNatives = "app_runtime/lwjgl/$versionDir/natives/$abi"
+                val outDir = File(lwjglNativesDir)
+                outDir.mkdirs()
+                val names = context.assets.list(assetNatives) ?: emptyArray()
+                names.forEach { name ->
+                    context.assets.open("$assetNatives/$name").use { input ->
+                        File(outDir, name).outputStream().use { output -> input.copyTo(output) }
+                    }
+                }
+                LoggerBridge.append("LWJGL: copied ${names.size} native libs from assets/$assetNatives")
+            }.onFailure { e ->
+                LoggerBridge.append("LWJGL: failed to copy AAR natives: ${e.message}")
+            }
+        }
+
+        if (coreLib.isFile) {
+            LoggerBridge.append("LWJGL: natives check passed after unpack: path=$lwjglNativesDir")
+        } else {
+            LoggerBridge.append("LWJGL: WARNING liblwjgl.so still missing in $lwjglNativesDir")
+        }
+    }
+
     protected fun getLibraryPath(): String {
         val libDirName = if (is64BitsDevice) "lib64" else "lib"
-        // Official puts LWJGL component natives first so liblwjgl.so / companions resolve there.
-        val lwjglNatives = File(PathManager.DIR_COMPONENTS, "lwjgl/3.4.1/natives/arm64-v8a")
-            .takeIf { it.isDirectory }?.absolutePath
-            ?: File(PathManager.DIR_COMPONENTS, "lwjgl3/natives")
-                .takeIf { it.isDirectory }?.absolutePath
+        val lwjglFirst = if (this::lwjglNativesDir.isInitialized) lwjglNativesDir else null
         val path = listOfNotNull(
-            lwjglNatives,
+            lwjglFirst,
             "/system/$libDirName",
             "/vendor/$libDirName",
             "/vendor/$libDirName/hw",

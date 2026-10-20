@@ -73,4 +73,13 @@ object Architecture {
         ARCH_X86 -> "x86"
         else -> "UNSUPPORTED_ARCH"
     }
+
+    /** Android ABI directory name (arm64-v8a, etc.) — same as official */
+    fun archAsStringAndroid(arch: Int): String = when (arch) {
+        ARCH_ARM64 -> "arm64-v8a"
+        ARCH_ARM -> "armeabi-v7a"
+        ARCH_X86_64 -> "x86_64"
+        ARCH_X86 -> "x86"
+        else -> "UNSUPPORTED_ARCH"
+    }
 }
