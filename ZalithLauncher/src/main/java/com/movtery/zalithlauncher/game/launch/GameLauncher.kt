@@ -40,6 +40,7 @@ import com.movtery.zalithlauncher.game.multirt.Runtime
 import com.movtery.zalithlauncher.game.multirt.RuntimesManager
 import com.movtery.zalithlauncher.game.path.GamePathManager
 import com.movtery.zalithlauncher.game.plugin.driver.DriverPluginManager
+import com.movtery.zalithlauncher.game.plugin.renderer.RendererPlugin
 import com.movtery.zalithlauncher.game.plugin.renderer.RendererPluginManager
 import com.movtery.zalithlauncher.game.renderer.Renderers
 import com.movtery.zalithlauncher.game.renderer.renderers.GL4ESRenderer
@@ -66,6 +67,7 @@ import java.io.File
 import javax.microedition.khronos.egl.EGL10
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.egl.EGLContext
+import com.movtery.zalithlauncher.game.plugin.renderer_v2.RendererV2Data
 
 private const val TAG = "GameLauncher"
 
@@ -404,6 +406,9 @@ private fun setRendererEnv(envMap: MutableMap<String, String>) {
     val renderer = Renderers.getCurrentRenderer()
     val rendererId = renderer.getRendererId()
 
+    // Official: tell SDL which GL/EGL implementation to use (critical for MobileGlues)
+    envMap["SDL_OPENGL_LIBRARY"] = rendererId
+
     if (rendererId.startsWith("opengles2")) {
         envMap["LIBGL_ES"] = "2"
         envMap["LIBGL_MIPMAP"] = "3"
@@ -416,6 +421,23 @@ private fun setRendererEnv(envMap: MutableMap<String, String>) {
 
     renderer.getRendererEGL()?.let { eglName ->
         envMap["POJAVEXEC_EGL"] = eglName
+
+        // Absolute path so SDL loads the same EGL as LWJGL (libmobileglues.so).
+        // Without this, SDL may bind system EGL while LWJGL uses MobileGlues → black screen.
+        val eglPath = if (eglName.startsWith("/")) {
+            eglName
+        } else {
+            val nativeLibPath = when (renderer) {
+                is RendererPlugin -> renderer.path
+                is RendererV2Data -> File(renderer.getRendererLibrary()).parent
+                    ?: PathManager.DIR_NATIVE_LIB
+                else -> PathManager.DIR_NATIVE_LIB
+            }
+            "$nativeLibPath/$eglName"
+        }
+        if (eglPath.isNotEmpty() && File(eglPath).isFile) {
+            envMap["SDL_EGL_LIBRARY"] = eglPath
+        }
     }
 
     envMap["POJAV_RENDERER"] = rendererId
