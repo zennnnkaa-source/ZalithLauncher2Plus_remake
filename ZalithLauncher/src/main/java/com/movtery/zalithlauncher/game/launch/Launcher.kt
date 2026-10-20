@@ -436,6 +436,9 @@ abstract class Launcher(
 
             if (FFmpegPluginManager.isAvailable) map["POJAV_FFMPEG_PATH"] = FFmpegPluginManager.executablePath!!
 
+            // MobileGlues loads ANGLE from the launcher (libEGL_angle / libGLESv2_angle).
+            // Explicit dir avoids plugin/system ANGLE mismatch (official ships ANGLE in jniLibs).
+            map["MG_ANGLE_DIR"] = PathManager.DIR_NATIVE_LIB
             map["ALSOFT_DRIVERS"] = "opensl,aaudio"
             map["ALSOFT_DISABLE_EVENTS"] = "1"
 
