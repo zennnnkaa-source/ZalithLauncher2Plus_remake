@@ -68,6 +68,10 @@ abstract class Launcher(
     val openPath: (folder: File) -> Unit
 ) {
     lateinit var runtime: Runtime
+
+    /** Per-launch LWJGL component natives dir (set by initLwjglComponent). */
+    private var lwjglVersion: Int = 341
+    protected lateinit var lwjglNativesDir: String
         protected set
 
     private val runtimeHome: String by lazy {
@@ -293,7 +297,7 @@ abstract class Launcher(
 
         // Official: point Freetype + shaderc at the LWJGL component natives dir
         // (same libs that liblwjgl.so was built against). APK lib/arm64 is a fallback only.
-        val lwjglNativeDir = if (this::lwjglNativesDir.isInitialized) lwjglNativesDir else PathManager.DIR_NATIVE_LIB
+        val lwjglNativeDir = if (this@Launcher::lwjglNativesDir.isInitialized) lwjglNativesDir else PathManager.DIR_NATIVE_LIB
         val freetypeNative = File(lwjglNativeDir, "libfreetype.so").takeIf { it.isFile }
             ?: File(PathManager.DIR_NATIVE_LIB, "libfreetype.so")
         val shadercNative = File(lwjglNativeDir, "libshaderc.so").takeIf { it.isFile }
@@ -348,7 +352,7 @@ abstract class Launcher(
         val libName = if (is64BitsDevice) "lib64" else "lib"
         val paths = buildList {
             // Official: LWJGL component natives first so liblwjgl*.so resolve correctly
-            if (this::lwjglNativesDir.isInitialized) add(lwjglNativesDir)
+            if (this@Launcher::lwjglNativesDir.isInitialized) add(lwjglNativesDir)
             FFmpegPluginManager.takeIf { it.isAvailable }?.libraryPath?.let { add(it) }
             RendererPluginManager.selectedRendererPlugin?.path?.let { add(it) }
             addAll(NativePluginManager.getPaths())
@@ -371,8 +375,6 @@ abstract class Launcher(
 
 
     // --- Official-style LWJGL component natives (liblwjgl.so etc.) ---
-    private var lwjglVersion: Int = 341
-    protected lateinit var lwjglNativesDir: String
 
     private fun lwjglVersionDir(version: Int): String =
         if (version >= 341) "3.4.1" else "3.3.3"
@@ -383,7 +385,7 @@ abstract class Launcher(
      * org.lwjgl.librarypath fell back to APK lib/arm64 (no liblwjgl.so).
      */
     protected suspend fun initLwjglComponent(context: android.content.Context, version: Int) {
-        if (this::lwjglNativesDir.isInitialized) return
+        if (this@Launcher::lwjglNativesDir.isInitialized) return
         lwjglVersion = version
         val abi = Architecture.archAsStringAndroid(Architecture.getDeviceArchitecture())
         lwjglNativesDir = File(
