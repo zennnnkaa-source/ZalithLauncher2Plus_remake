@@ -291,16 +291,20 @@ abstract class Launcher(
 
         args.add("-Dorg.lwjgl.openal.libname=${PathManager.DIR_NATIVE_LIB}/libopenal.so")
 
-        // Force LWJGL to use the Freetype library intended for it, instead of using the one
-        // that we ship with Java (since it may be older than what's needed)
-        args.add("-Dorg.lwjgl.freetype.libname=${PathManager.DIR_NATIVE_LIB}/libfreetype.so")
+        // Official: point Freetype + shaderc at the LWJGL component natives dir
+        // (same libs that liblwjgl.so was built against). APK lib/arm64 is a fallback only.
+        val lwjglNativeDir = if (this::lwjglNativesDir.isInitialized) lwjglNativesDir else PathManager.DIR_NATIVE_LIB
+        val freetypeNative = File(lwjglNativeDir, "libfreetype.so").takeIf { it.isFile }
+            ?: File(PathManager.DIR_NATIVE_LIB, "libfreetype.so")
+        val shadercNative = File(lwjglNativeDir, "libshaderc.so").takeIf { it.isFile }
+            ?: File(PathManager.DIR_NATIVE_LIB, "libshaderc.so")
+        args.add("-Dorg.lwjgl.freetype.libname=${freetypeNative.absolutePath}")
 
         // Our spirv-cross is compiled shared, so it gets named shared.
         args.add("-Dorg.lwjgl.spvc.libname=spirv-cross-c-shared")
 
         // MC 26.3 RenderPearl needs shaderc_compile_options_set_max_id_bound.
-        // Force the 3.4.1 libshaderc from the APK native dir (not an old extract/cache).
-        args.add("-Dorg.lwjgl.shaderc.libname=${PathManager.DIR_NATIVE_LIB}/libshaderc.so")
+        args.add("-Dorg.lwjgl.shaderc.libname=${shadercNative.absolutePath}")
 
         // We don't have jemalloc for our LWJGL so set the allocator to system to avoid error logs
         args.add("-Dorg.lwjgl.system.allocator=system")
@@ -343,6 +347,8 @@ abstract class Launcher(
 
         val libName = if (is64BitsDevice) "lib64" else "lib"
         val paths = buildList {
+            // Official: LWJGL component natives first so liblwjgl*.so resolve correctly
+            if (this::lwjglNativesDir.isInitialized) add(lwjglNativesDir)
             FFmpegPluginManager.takeIf { it.isAvailable }?.libraryPath?.let { add(it) }
             RendererPluginManager.selectedRendererPlugin?.path?.let { add(it) }
             addAll(NativePluginManager.getPaths())
