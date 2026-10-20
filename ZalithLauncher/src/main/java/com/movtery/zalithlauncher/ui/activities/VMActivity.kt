@@ -354,6 +354,8 @@ class VMActivity : BaseAppCompatActivity(), SurfaceTextureListener, SurfaceHolde
     private val vmViewModel: VMViewModel by viewModels()
 
     private var applySizeToSurface: ((width: Int, height: Int) -> Unit)? = null
+    /** Official: host view for SDL surface parent (IME + window attach) */
+    private var gameSurfaceView: android.view.View? = null
 
     private inline fun <T> withHandler(block: AbstractHandler.() -> T): T {
         return vmViewModel.session.handler.block()
@@ -598,6 +600,7 @@ class VMActivity : BaseAppCompatActivity(), SurfaceTextureListener, SurfaceHolde
 
     override fun onDestroy() {
         GameSurfaceRegistry.unregister()
+        gameSurfaceView = null
         stopAllService()
         withHandler { onDestroy() }
         // Official: clear SDL session state so the next launch does not skip init
@@ -671,10 +674,11 @@ class VMActivity : BaseAppCompatActivity(), SurfaceTextureListener, SurfaceHolde
     override fun onSurfaceTextureAvailable(surface: SurfaceTexture, width: Int, height: Int) {
         runCatching {
             val native = android.view.Surface(surface)
+            // Official: pass SurfaceView/TextureView parent so SDL attaches to the visible hierarchy
             SdlBridge.prepareSurface(
                 this,
                 native,
-                null,
+                gameSurfaceView?.parent as? android.view.ViewGroup,
                 surface
             )
         }.onFailure {
@@ -727,7 +731,7 @@ class VMActivity : BaseAppCompatActivity(), SurfaceTextureListener, SurfaceHolde
             SdlBridge.prepareSurface(
                 this,
                 holder.surface,
-                null,
+                gameSurfaceView?.parent as? android.view.ViewGroup,
                 holder
             )
         }.onFailure {
@@ -822,6 +826,7 @@ class VMActivity : BaseAppCompatActivity(), SurfaceTextureListener, SurfaceHolde
                         SurfaceView(context).apply {
                             holder.addCallback(this@VMActivity)
                         }.also { view ->
+                            gameSurfaceView = view
                             GameSurfaceRegistry.register(view)
                             applySizeToSurface = { width, height ->
                                 view.holder.setFixedSize(width, height)
@@ -834,6 +839,7 @@ class VMActivity : BaseAppCompatActivity(), SurfaceTextureListener, SurfaceHolde
 
                             surfaceTextureListener = this@VMActivity
                         }.also { view ->
+                            gameSurfaceView = view
                             GameSurfaceRegistry.register(view)
                             applySizeToSurface = { width, height ->
                                 view.surfaceTexture?.setDefaultBufferSize(width, height)
