@@ -180,7 +180,7 @@ abstract class Launcher(
             put("pojav.path.private.account", PathManager.DIR_DATA_BASES.absolutePath)
             // Default OFF: loading system libvulkan.so triggers SIGSEGV in libpojavexec JNI_OnLoad
             // on this Android stack when Minecraft 26.3 calls NativeLibrariesBootstrap.tryLoadingVulkan()
-            put("org.lwjgl.vulkan.libname", "/system/lib64/libzalith_vulkan_disabled.so")
+            put("org.lwjgl.vulkan.libname", "libvulkan.so")
             put("glfwstub.windowWidth", screenSize.width.toString())
             put("glfwstub.windowHeight", screenSize.height.toString())
             put("glfwstub.initEgl", "false")
@@ -354,7 +354,13 @@ abstract class Launcher(
 
     protected fun getLibraryPath(): String {
         val libDirName = if (is64BitsDevice) "lib64" else "lib"
+        // Official puts LWJGL component natives first so liblwjgl.so / companions resolve there.
+        val lwjglNatives = File(PathManager.DIR_COMPONENTS, "lwjgl/3.4.1/natives/arm64-v8a")
+            .takeIf { it.isDirectory }?.absolutePath
+            ?: File(PathManager.DIR_COMPONENTS, "lwjgl3/natives")
+                .takeIf { it.isDirectory }?.absolutePath
         val path = listOfNotNull(
+            lwjglNatives,
             "/system/$libDirName",
             "/vendor/$libDirName",
             "/vendor/$libDirName/hw",

@@ -245,10 +245,19 @@ class LaunchArgs(
         argsList.add("-Dminecraft.launcher.brand=${BuildKeys.LAUNCHER_NAME}")
         argsList.add("-Dminecraft.launcher.version=${BuildConfig.VERSION_NAME}")
 
-        // Disable LWJGL Vulkan by default (SIGSEGV in libpojavexec JNI_OnLoad on Android)
-        argsList.add("-Dorg.lwjgl.vulkan.libname=/system/lib64/libzalith_vulkan_disabled.so")
-        // DIR_NATIVE_LIB = APK lib/<abi> (from jniLibs + AARs in ZalithLauncher/libs/)
-        argsList.add("-Dorg.lwjgl.librarypath=${PathManager.DIR_NATIVE_LIB}")
+        // Official 2.7.x uses real libvulkan.so. MC 26.x ClientBootstrap touches
+        // org.lwjgl.vulkan.* even on the OpenGL path; the old "disabled" stub made
+        // Plus diverge and contributed to a black screen while official played fine
+        // with the same MobileGlues shader errors.
+        argsList.add("-Dorg.lwjgl.vulkan.libname=libvulkan.so")
+        // Prefer LWJGL 3.4.1 natives from components (same order as official log).
+        val lwjglNatives = File(PathManager.DIR_COMPONENTS, "lwjgl/3.4.1/natives/arm64-v8a")
+            .takeIf { it.isDirectory }
+            ?: File(PathManager.DIR_COMPONENTS, "lwjgl3/natives")
+                .takeIf { it.isDirectory }
+        argsList.add(
+            "-Dorg.lwjgl.librarypath=${lwjglNatives?.absolutePath ?: PathManager.DIR_NATIVE_LIB}"
+        )
         argsList.add("-Dorg.lwjgl.sdl.libname=SDL3")
 
         return argsList
