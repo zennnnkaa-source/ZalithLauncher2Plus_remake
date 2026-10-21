@@ -595,6 +595,21 @@ class VMActivity : BaseAppCompatActivity(), SurfaceTextureListener, SurfaceHolde
         ZLBridgeStates.onWindowChange()
         CallbackBridge.sendUpdateWindowSize(windowWidth, windowHeight)
 
+        // Official: after size change, tell SDL the drawable size so the Android
+        // video driver rebinds buffers to the TextureView/SurfaceView surface.
+        // Without this, MC 26.3 can keep a valid GL context that never presents
+        // (black screen + sound + draw calls).
+        if (SdlBridge.getSdlEnabled()) {
+            runCatching {
+                org.libsdl.app.SDLActivity.getSDLSurface()?.let { sdlSurface ->
+                    sdlSurface.surfaceChanged()
+                    sdlSurface.nativeResize(windowWidth, windowHeight)
+                }
+            }.onFailure {
+                LoggerBridge.append("ZalithLauncher: SDL surface resize failed: $it")
+            }
+        }
+
         return IntSize(windowWidth, windowHeight)
     }
 
@@ -675,10 +690,15 @@ class VMActivity : BaseAppCompatActivity(), SurfaceTextureListener, SurfaceHolde
         runCatching {
             val native = android.view.Surface(surface)
             // Official: pass SurfaceView/TextureView parent so SDL attaches to the visible hierarchy
+            val layout = (gameSurfaceView ?: GameSurfaceRegistry.getView())?.parent as? android.view.ViewGroup
+            LoggerBridge.append(
+                "ZalithLauncher: prepareSurface TextureView valid=${native.isValid} " +
+                    "view=${gameSurfaceView != null} parent=${layout != null}"
+            )
             SdlBridge.prepareSurface(
                 this,
                 native,
-                gameSurfaceView?.parent as? android.view.ViewGroup,
+                layout,
                 surface
             )
         }.onFailure {
@@ -728,10 +748,15 @@ class VMActivity : BaseAppCompatActivity(), SurfaceTextureListener, SurfaceHolde
         pendingNewSurface?.complete(holder.surface)
         // MC 26.x SDL path needs Android Surface registered before SDL_Init
         runCatching {
+            val layout = (gameSurfaceView ?: GameSurfaceRegistry.getView())?.parent as? android.view.ViewGroup
+            LoggerBridge.append(
+                "ZalithLauncher: prepareSurface SurfaceView valid=${holder.surface.isValid} " +
+                    "view=${gameSurfaceView != null} parent=${layout != null}"
+            )
             SdlBridge.prepareSurface(
                 this,
                 holder.surface,
-                gameSurfaceView?.parent as? android.view.ViewGroup,
+                layout,
                 holder
             )
         }.onFailure {
@@ -824,25 +849,25 @@ class VMActivity : BaseAppCompatActivity(), SurfaceTextureListener, SurfaceHolde
                         Renderers.getCurrentRenderer().getUniqueIdentifier() != KopperZinkRenderer.getUniqueIdentifier())
                     if (useSurfaceView) {
                         SurfaceView(context).apply {
+                            // Assign before callback so surfaceCreated can resolve parent
+                            gameSurfaceView = this
+                            GameSurfaceRegistry.register(this)
                             holder.addCallback(this@VMActivity)
-                        }.also { view ->
-                            gameSurfaceView = view
-                            GameSurfaceRegistry.register(view)
                             applySizeToSurface = { width, height ->
-                                view.holder.setFixedSize(width, height)
+                                holder.setFixedSize(width, height)
                             }
                         }
                     } else {
                         TextureView(context).apply {
                             isOpaque = true
                             alpha = 1.0f
-
+                            // Assign before listener — onSurfaceTextureAvailable can fire
+                            // during setSurfaceTextureListener and needs gameSurfaceView set
+                            gameSurfaceView = this
+                            GameSurfaceRegistry.register(this)
                             surfaceTextureListener = this@VMActivity
-                        }.also { view ->
-                            gameSurfaceView = view
-                            GameSurfaceRegistry.register(view)
                             applySizeToSurface = { width, height ->
-                                view.surfaceTexture?.setDefaultBufferSize(width, height)
+                                surfaceTexture?.setDefaultBufferSize(width, height)
                             }
                         }
                     }

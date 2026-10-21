@@ -358,10 +358,24 @@ public class CallbackBridge {
                         SdlBridge.setSdlEnabled(true);
                         SDLSurface surface = SDLActivity.getSDLSurface();
                         if (surface != null) {
+                            // Official path: surfaceChanged + nativeResize with launcher window size
                             surface.surfaceChanged();
                             if (windowWidth > 0 && windowHeight > 0) {
                                 surface.nativeResize(windowWidth, windowHeight);
+                            } else {
+                                LoggerBridge.append(
+                                    "ZalithLauncher: WARNING window size is 0x0 at SDL bind"
+                                );
                             }
+                            LoggerBridge.append(
+                                "ZalithLauncher: SDL surface bound window="
+                                    + windowWidth + "x" + windowHeight
+                                    + " nativeSurface="
+                                    + (SDLSurface.getNativeSurface() != null
+                                        && SDLSurface.getNativeSurface().isValid())
+                            );
+                        } else {
+                            LoggerBridge.append("ZalithLauncher: WARNING getSDLSurface() is null after setupJNI");
                         }
                         LoggerBridge.append("ZalithLauncher: SDL support enabled!");
                         return true;
