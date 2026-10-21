@@ -599,7 +599,7 @@ class VMActivity : BaseAppCompatActivity(), SurfaceTextureListener, SurfaceHolde
         // video driver rebinds buffers to the TextureView/SurfaceView surface.
         // Without this, MC 26.3 can keep a valid GL context that never presents
         // (black screen + sound + draw calls).
-        if (SdlBridge.getSdlEnabled()) {
+        if (SdlBridge.sdlEnabled) {
             runCatching {
                 org.libsdl.app.SDLActivity.getSDLSurface()?.let { sdlSurface ->
                     sdlSurface.surfaceChanged()
