@@ -629,6 +629,50 @@ static void *proxy_SDL_CreateSystemCursor(int id) {
     return NULL;
 }
 
+
+// --- Text input safety (MC 26.3 calls StartTextInput from Render thread → SIGSEGV) ---
+// Official requires SDL_RunOnMainThread; launcher IME uses SdlBridge.setNativeTextInputActive.
+// Soft-no-op the direct LWJGL path so focus changes do not crash.
+
+typedef bool (*sdlStartTextInputSimple_t)(void *window);
+typedef bool (*sdlStartTextInputProps_t)(void *window, uint32_t props);
+typedef bool (*sdlStopTextInput_t)(void *window);
+
+static bool custom_SDL_StartTextInput_Func(void *window) {
+    (void) window;
+    BYTEHOOK_POP_STACK();
+    return true;
+}
+
+static bool custom_SDL_StartTextInputWithProperties_Func(void *window, uint32_t props) {
+    (void) window;
+    (void) props;
+    BYTEHOOK_POP_STACK();
+    return true;
+}
+
+static bool custom_SDL_StopTextInput_Func(void *window) {
+    (void) window;
+    BYTEHOOK_POP_STACK();
+    return true;
+}
+
+static bool proxy_SDL_StartTextInput(void *window) {
+    (void) window;
+    return true;
+}
+
+static bool proxy_SDL_StartTextInputWithProperties(void *window, uint32_t props) {
+    (void) window;
+    (void) props;
+    return true;
+}
+
+static bool proxy_SDL_StopTextInput(void *window) {
+    (void) window;
+    return true;
+}
+
 void create_sdl_hooks(bytehook_stub_t (*bytehook_hook_all_p)(const char *callee_path_name, const char *sym_name, void *new_func,
                                                              bytehook_hooked_t hooked, void *hooked_arg)) {
     // Don't set callee_path_name to anything besides NULL or else it won't be able to find the symbol
@@ -650,8 +694,12 @@ void create_sdl_hooks(bytehook_stub_t (*bytehook_hook_all_p)(const char *callee_
     // Soft-safe cursor APIs (prevent SIGSEGV in SDL_SetCursor on Android)
     bytehook_stub_t stub_SDL_SetCursor = bytehook_hook_all_p(NULL, "SDL_SetCursor", &custom_SDL_SetCursor_Func, NULL, NULL);
     bytehook_stub_t stub_SDL_CreateSystemCursor = bytehook_hook_all_p(NULL, "SDL_CreateSystemCursor", &custom_SDL_CreateSystemCursor_Func, NULL, NULL);
-    LOG_TO_I("SDL_Hook: Successfully initialized SDL hooks, stubs: InitSubSystem=%p CreateWindow=%p DestroyWindow=%p SetCursor=%p CreateSystemCursor=%p",
-             stub_SDL_InitSubSystem, stub_SDL_CreateWindow, stub_SDL_DestroyWindow, stub_SDL_SetCursor, stub_SDL_CreateSystemCursor);
+    // Soft-safe text input (prevent SIGSEGV in StartTextInput from Render thread)
+    bytehook_stub_t stub_SDL_StartTextInput = bytehook_hook_all_p(NULL, "SDL_StartTextInput", &custom_SDL_StartTextInput_Func, NULL, NULL);
+    bytehook_stub_t stub_SDL_StartTextInputWithProperties = bytehook_hook_all_p(NULL, "SDL_StartTextInputWithProperties", &custom_SDL_StartTextInputWithProperties_Func, NULL, NULL);
+    bytehook_stub_t stub_SDL_StopTextInput = bytehook_hook_all_p(NULL, "SDL_StopTextInput", &custom_SDL_StopTextInput_Func, NULL, NULL);
+    LOG_TO_I("SDL_Hook: hooks ready SetCursor=%p StartTextInput=%p StartTextInputWithProps=%p",
+             stub_SDL_SetCursor, stub_SDL_StartTextInput, stub_SDL_StartTextInputWithProperties);
 }
 
 /** customDlsym 出口：把 SDL 符号的解析结果换成 dlsym 层代理；返回 NULL 表示不拦截 */
@@ -697,6 +745,15 @@ void *sdlDlsymProxy(const char *symbol, void *real) {
     }
     if (strcmp(symbol, "SDL_CreateSystemCursor") == 0) {
         return (void *) proxy_SDL_CreateSystemCursor;
+    }
+    if (strcmp(symbol, "SDL_StartTextInput") == 0) {
+        return (void *) proxy_SDL_StartTextInput;
+    }
+    if (strcmp(symbol, "SDL_StartTextInputWithProperties") == 0) {
+        return (void *) proxy_SDL_StartTextInputWithProperties;
+    }
+    if (strcmp(symbol, "SDL_StopTextInput") == 0) {
+        return (void *) proxy_SDL_StopTextInput;
     }
     return NULL;
 }

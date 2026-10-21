@@ -176,13 +176,13 @@ object SdlBridge {
         // Optional: full native port from official input_bridge when needed
     }
 
-    /** True when MC is on the SDL window path (26.3+). Stub until native is wired. */
+    /** True when MC is on the SDL window path (26.3+). Native checks primary SDL window. */
     @JvmStatic
-    fun isSdlRenderActive(): Boolean = sdlEnabled
+    external fun isSdlRenderActive(): Boolean
 
     @JvmStatic
-    fun setNativeTextInputActive(active: Boolean): Boolean = false
+    external fun setNativeTextInputActive(active: Boolean): Boolean
 
     @JvmStatic
-    fun isNativeTextInputActive(): Boolean = false
+    external fun isNativeTextInputActive(): Boolean
 }

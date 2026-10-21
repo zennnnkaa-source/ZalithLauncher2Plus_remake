@@ -15,6 +15,7 @@
 #include <jni.h>
 #include <libgen.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <stdatomic.h>
 #include <math.h>
@@ -743,4 +744,73 @@ typedef struct SDL_Window SDL_Window;
 static SDL_Window *sSdlPrimaryWindow = NULL;
 void sdlBridgeSetPrimaryWindow(struct SDL_Window *window) {
     sSdlPrimaryWindow = window;
+}
+
+
+/* SDL text-input channel — ported from official (must run Start/Stop on SDL main thread) */
+typedef uint32_t SDL_PropertiesID;
+typedef void (*SDL_MainThreadCallback)(void *userdata);
+typedef bool (*sdlStartTextInput_t)(SDL_Window *, SDL_PropertiesID);
+typedef bool (*sdlStopTextInput_t)(SDL_Window *);
+typedef bool (*sdlIsTextInputActive_t)(SDL_Window *);
+typedef bool (*sdlRunOnMainThread_t)(SDL_MainThreadCallback, void *, bool);
+
+static void sdlTextInputMainThreadCallback(void *userdata) {
+    void *handle = dlopen("libSDL3.so", RTLD_NOW);
+    if (handle == NULL) return;
+    SDL_Window *window = sSdlPrimaryWindow;
+    if (window == NULL) return;
+    if (userdata != NULL) {
+        sdlStartTextInput_t start = (sdlStartTextInput_t) dlsym(handle, "SDL_StartTextInput");
+        if (start != NULL) start(window, 0);
+        else LOG_TO_E("<%s> %s", "SDL", "sdlTextInputMainThreadCallback: SDL_StartTextInput not found");
+    } else {
+        sdlStopTextInput_t stop = (sdlStopTextInput_t) dlsym(handle, "SDL_StopTextInput");
+        if (stop != NULL) stop(window);
+        else LOG_TO_E("<%s> %s", "SDL", "sdlTextInputMainThreadCallback: SDL_StopTextInput not found");
+    }
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_movtery_zalithlauncher_game_sdl_SdlBridge_isSdlRenderActive(__attribute__((unused)) JNIEnv* env, __attribute__((unused)) jclass clazz) {
+    return sSdlPrimaryWindow != NULL ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_movtery_zalithlauncher_game_sdl_SdlBridge_setNativeTextInputActive(__attribute__((unused)) JNIEnv* env, __attribute__((unused)) jclass clazz, jboolean active) {
+    if (sSdlPrimaryWindow == NULL) {
+        LOG_TO_W("<%s> %s", "SDL", "setNativeTextInputActive: no SDL window (SDL render path inactive)");
+        return JNI_FALSE;
+    }
+    void *handle = dlopen("libSDL3.so", RTLD_NOW);
+    if (handle == NULL) {
+        LOG_TO_E("<%s> %s", "SDL", "setNativeTextInputActive: libSDL3.so dlopen failed");
+        return JNI_FALSE;
+    }
+    sdlRunOnMainThread_t runOnMain = (sdlRunOnMainThread_t) dlsym(handle, "SDL_RunOnMainThread");
+    if (runOnMain == NULL) {
+        LOG_TO_E("<%s> %s", "SDL", "setNativeTextInputActive: SDL_RunOnMainThread not found");
+        return JNI_FALSE;
+    }
+    bool result = runOnMain(sdlTextInputMainThreadCallback, (void *) (intptr_t) (active ? 1 : 0), 0);
+    if (!result) {
+        LOG_TO_E("<%s> %s", "SDL", "setNativeTextInputActive: SDL_RunOnMainThread dispatch failed");
+    }
+    return result ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_movtery_zalithlauncher_game_sdl_SdlBridge_isNativeTextInputActive(__attribute__((unused)) JNIEnv* env, __attribute__((unused)) jclass clazz) {
+    if (sSdlPrimaryWindow == NULL) return JNI_FALSE;
+    void *handle = dlopen("libSDL3.so", RTLD_NOW);
+    if (handle == NULL) {
+        LOG_TO_E("<%s> %s", "SDL", "isNativeTextInputActive: libSDL3.so dlopen failed");
+        return JNI_FALSE;
+    }
+    sdlIsTextInputActive_t isActive = (sdlIsTextInputActive_t) dlsym(handle, "SDL_TextInputActive");
+    if (isActive == NULL) {
+        LOG_TO_E("<%s> %s", "SDL", "isNativeTextInputActive: SDL_TextInputActive not found");
+        return JNI_FALSE;
+    }
+    return isActive(sSdlPrimaryWindow) ? JNI_TRUE : JNI_FALSE;
 }
