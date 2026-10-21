@@ -8,6 +8,8 @@ import android.content.ClipDescription;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.view.Choreographer;
+import android.view.KeyEvent;
+import android.view.MotionEvent;
 
 import androidx.annotation.Keep;
 import java.util.concurrent.TimeUnit;
@@ -17,6 +19,7 @@ import android.os.Handler;
 import androidx.annotation.Nullable;
 
 import com.movtery.inputmap.keycodes.LwjglGlfwKeycode;
+import com.movtery.zalithlauncher.game.input.EfficientAndroidLWJGLKeycode;
 import com.movtery.zalithlauncher.BuildKeys;
 import com.movtery.zalithlauncher.bridge.CursorShape;
 import com.movtery.zalithlauncher.bridge.LoggerBridge;
@@ -61,6 +64,8 @@ public class CallbackBridge {
     public static final int CLIPBOARD_OPEN = 2002;
     
     public static volatile int windowWidth, windowHeight;
+    /** Accumulated Android button state for SDL onNativeMouse dual-path. */
+    private static int sMouseButtonState = 0;
     public static volatile int physicalWidth, physicalHeight;
 
     // GLFW direct gamepad shared buffers (used by DirectGamepad / official SDL path)
@@ -75,7 +80,7 @@ public class CallbackBridge {
     }
 
 
-    public static float mouseX, mouseY;
+    public static float mouseX, mouseY, deltaX, deltaY;
     public volatile static boolean holdingAlt, holdingCapslock, holdingCtrl,
             holdingNumlock, holdingShift;
 
@@ -97,25 +102,62 @@ public class CallbackBridge {
     public static void sendCursorPos(float x, float y) {
         mouseX = x;
         mouseY = y;
+        deltaX = 0f;
+        deltaY = 0f;
         nativeSendCursorPos(mouseX, mouseY);
+        // Official dual-path: MC 26.3 SDL window needs SDL mouse events
+        if (!SdlBridge.getSdlEnabled()) return;
+        SDLActivity.onNativeMouse(0, MotionEvent.ACTION_MOVE, x, y, false);
     }
 
     public static void sendCursorDelta(float x, float y) {
-        sendCursorPos(mouseX + x, mouseY + y);
+        deltaX = x;
+        deltaY = y;
+        mouseX += x;
+        mouseY += y;
+        nativeSendCursorPos(mouseX, mouseY);
+        if (!SdlBridge.getSdlEnabled()) return;
+        SDLActivity.onNativeMouse(0, MotionEvent.ACTION_MOVE, x, y, true);
     }
 
     public static void sendKeycode(int keycode, char keychar, int scancode, int modifiers, boolean isDown) {
-        // TODO CHECK: This may cause input issue, not receive input!
         if (keycode != 0) nativeSendKey(keycode, scancode, isDown ? 1 : 0, modifiers);
         if (isDown && !Character.isISOControl(keychar)) {
             nativeSendCharMods(keychar, modifiers);
             nativeSendChar(keychar);
         }
+        // Official dual-path: also feed SDL when MC runs on SDL video driver
+        if (!SdlBridge.getSdlEnabled()) return;
+        int androidKeycode = EfficientAndroidLWJGLKeycode.getSdlAndroidKeycode(keycode);
+        if (androidKeycode == KeyEvent.KEYCODE_UNKNOWN) return;
+        try {
+            if (isDown) {
+                SDLActivity.onNativeKeyDown(androidKeycode);
+                if (isTextEventChar(keychar, modifiers) && SDLActivity.isSDLTextInputActive()) {
+                    SDLActivity.onNativeTextInput(String.valueOf(keychar));
+                }
+            } else {
+                SDLActivity.onNativeKeyUp(androidKeycode);
+            }
+        } catch (Throwable t) {
+            LoggerBridge.append("ZalithLauncher: SDL key dual-path failed: " + t);
+        }
+    }
+
+    private static boolean isTextEventChar(char keychar, int modifiers) {
+        if (Character.isISOControl(keychar) || keychar == '\u0000') return false;
+        // skip when Ctrl/Alt held (shortcuts)
+        if ((modifiers & (0x2 | 0x4)) != 0) return false; // Ctrl / Alt
+        return true;
     }
 
     public static void sendChar(char keychar, int modifiers){
         nativeSendCharMods(keychar,modifiers);
         nativeSendChar(keychar);
+        if (!SdlBridge.getSdlEnabled()) return;
+        if (isTextEventChar(keychar, modifiers) && SDLActivity.isSDLTextInputActive()) {
+            SDLActivity.onNativeTextInput(String.valueOf(keychar));
+        }
     }
 
     public static void sendKeyPress(int keyCode, int modifiers, boolean status) {
@@ -140,8 +182,41 @@ public class CallbackBridge {
     }
 
     public static void sendMouseKeycode(int button, int modifiers, boolean isDown) {
-        // if (isGrabbing()) DEBUG_STRING.append("MouseGrabStrace: " + android.util.Log.getStackTraceString(new Throwable()) + "\n");
         nativeSendMouseButton(button, isDown ? 1 : 0, modifiers);
+        // Official dual-path: SDL needs MotionEvent button state
+        if (!SdlBridge.getSdlEnabled()) return;
+        int aKey = -1;
+        switch (button) {
+            case LwjglGlfwKeycode.GLFW_MOUSE_BUTTON_LEFT:
+                aKey = MotionEvent.BUTTON_PRIMARY;
+                break;
+            case LwjglGlfwKeycode.GLFW_MOUSE_BUTTON_RIGHT:
+                aKey = MotionEvent.BUTTON_SECONDARY;
+                break;
+            case LwjglGlfwKeycode.GLFW_MOUSE_BUTTON_MIDDLE:
+                aKey = MotionEvent.BUTTON_TERTIARY;
+                break;
+            case LwjglGlfwKeycode.GLFW_MOUSE_BUTTON_5:
+                aKey = MotionEvent.BUTTON_BACK;
+                break;
+            case LwjglGlfwKeycode.GLFW_MOUSE_BUTTON_4:
+                aKey = MotionEvent.BUTTON_FORWARD;
+                break;
+        }
+        if (aKey != -1) {
+            if (isDown) {
+                sMouseButtonState |= aKey;
+            } else {
+                sMouseButtonState &= ~aKey;
+            }
+            SDLActivity.onNativeMouse(
+                    sMouseButtonState,
+                    isDown ? MotionEvent.ACTION_DOWN : MotionEvent.ACTION_UP,
+                    mouseX,
+                    mouseY,
+                    false
+            );
+        }
     }
 
     public static void sendMouseKeycode(int keycode) {
@@ -151,6 +226,8 @@ public class CallbackBridge {
     
     public static void sendScroll(double xoffset, double yoffset) {
         nativeSendScroll(xoffset, yoffset);
+        if (!SdlBridge.getSdlEnabled()) return;
+        SDLActivity.onNativeMouse(0, MotionEvent.ACTION_SCROLL, (float) xoffset, (float) yoffset, false);
     }
 
     public static void sendUpdateWindowSize(int w, int h) {

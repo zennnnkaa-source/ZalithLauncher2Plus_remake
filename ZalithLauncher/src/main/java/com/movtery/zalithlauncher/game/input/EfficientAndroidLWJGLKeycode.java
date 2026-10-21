@@ -221,7 +221,7 @@ public class EfficientAndroidLWJGLKeycode {
         for (int i = 0; i < sLwjglKeycodes.length; i++) {
             if(sLwjglKeycodes[i] == lwjglKey) return i;
         }
-        return 0;
+        return -1;
     }
 
     private static void add(int androidKeycode, short LWJGLKeycode){
@@ -229,5 +229,50 @@ public class EfficientAndroidLWJGLKeycode {
         sLwjglKeycodes[mTmpCount] = LWJGLKeycode;
 
         mTmpCount ++;
+    }
+
+    private static final android.view.KeyCharacterMap mKcm =
+            android.view.KeyCharacterMap.load(android.view.KeyCharacterMap.VIRTUAL_KEYBOARD);
+    private static final char[] sCharBuffer = new char[1];
+
+    /**
+     * Takes a GLFW keycode and returns equivalent android keycode.
+     */
+    public static int getAndroidKeycode(int lwjglGlfwKeycode) {
+        if (lwjglGlfwKeycode == LwjglGlfwKeycode.GLFW_KEY_2) return android.view.KeyEvent.KEYCODE_2;
+        if (lwjglGlfwKeycode == LwjglGlfwKeycode.GLFW_KEY_3) return android.view.KeyEvent.KEYCODE_3;
+        int index = getIndexByValue(lwjglGlfwKeycode);
+        return index >= 0 && index < sAndroidKeycodes.length
+                ? sAndroidKeycodes[index]
+                : android.view.KeyEvent.KEYCODE_UNKNOWN;
+    }
+
+    /** Official: GLFW → Android keycode mapping used by SDL dual-path input. */
+    public static int getSdlAndroidKeycode(int lwjglGlfwKeycode) {
+        return switch (lwjglGlfwKeycode) {
+            case LwjglGlfwKeycode.GLFW_KEY_ESCAPE -> android.view.KeyEvent.KEYCODE_ESCAPE;
+            case LwjglGlfwKeycode.GLFW_KEY_HOME -> android.view.KeyEvent.KEYCODE_MOVE_HOME;
+            case LwjglGlfwKeycode.GLFW_KEY_END -> android.view.KeyEvent.KEYCODE_MOVE_END;
+            case LwjglGlfwKeycode.GLFW_KEY_KP_ADD -> android.view.KeyEvent.KEYCODE_NUMPAD_ADD;
+            case LwjglGlfwKeycode.GLFW_KEY_KP_DECIMAL -> android.view.KeyEvent.KEYCODE_NUMPAD_DOT;
+            case LwjglGlfwKeycode.GLFW_KEY_KP_ENTER -> android.view.KeyEvent.KEYCODE_NUMPAD_ENTER;
+            case LwjglGlfwKeycode.GLFW_KEY_DELETE -> android.view.KeyEvent.KEYCODE_FORWARD_DEL;
+            case LwjglGlfwKeycode.GLFW_KEY_KP_EQUAL -> android.view.KeyEvent.KEYCODE_NUMPAD_EQUALS;
+            case LwjglGlfwKeycode.GLFW_KEY_LEFT_SUPER -> android.view.KeyEvent.KEYCODE_META_LEFT;
+            case LwjglGlfwKeycode.GLFW_KEY_RIGHT_SUPER -> android.view.KeyEvent.KEYCODE_META_RIGHT;
+            case LwjglGlfwKeycode.GLFW_KEY_MENU -> android.view.KeyEvent.KEYCODE_MENU;
+            default -> getAndroidKeycode(lwjglGlfwKeycode);
+        };
+    }
+
+    /**
+     * Takes a char and returns equivalent android keycode.
+     */
+    public static int getAndroidKeycode(char c) {
+        sCharBuffer[0] = c;
+        android.view.KeyEvent[] events = mKcm.getEvents(sCharBuffer);
+        return events != null && events.length > 0
+                ? events[0].getKeyCode()
+                : android.view.KeyEvent.KEYCODE_UNKNOWN;
     }
 }
