@@ -58,9 +58,6 @@ DECL_DLSYM(SDL_CreateWindow)
 DECL_DLSYM(SDL_CreateWindowWithProperties)
 DECL_DLSYM(SDL_DestroyWindow)
 DECL_DLSYM(SDL_EGL_GetProcAddress)
-DECL_DLSYM(SDL_SetCursor)
-DECL_DLSYM(SDL_CreateSystemCursor)
-DECL_DLSYM(SDL_GetDefaultCursor)
 
 typedef void *EGLDisplay;
 typedef void *EGLConfig;
@@ -601,47 +598,25 @@ static void proxy_SDL_UnloadObject(void *handle) {
 
 
 // --- Android cursor safety ---
-// MC 26.3 calls SDL_SetCursor / CreateSystemCursor from the render thread when
-// hovering GUI. On some Android/SDL3 builds this SIGSEGVs inside libSDL3
-// (see hs_err … SDL_SetCursor). Launcher already paints cursor via
-// ZLBridgeStates; soft-no-op SetCursor and fall back CreateSystemCursor.
+// MC 26.3 applyCursor → SDL_SetCursor can SIGSEGV inside libSDL3 on some Android
+// GPUs. Launcher already paints cursor via ZLBridgeStates; soft-no-op is safe.
+// Style matches other hooks in this file (BYTEHOOK_POP_STACK, no DECL_DLSYM).
 
 typedef bool (*sdlSetCursor_t)(void *cursor);
 typedef void *(*sdlCreateSystemCursor_t)(int id);
-typedef void *(*sdlGetDefaultCursor_t)(void);
-
-static sdlSetCursor_t realSdlSetCursor = NULL;
-static sdlCreateSystemCursor_t realSdlCreateSystemCursor = NULL;
-static sdlGetDefaultCursor_t realSdlGetDefaultCursor = NULL;
 
 static bool custom_SDL_SetCursor_Func(void *cursor) {
-    BYTEHOOK_STACK_SCOPE();
-    // Never call into broken system-cursor paths; always report success.
     (void) cursor;
+    // Do not call previous — real SDL_SetCursor crashes on this device class.
+    BYTEHOOK_POP_STACK();
     return true;
 }
 
 static void *custom_SDL_CreateSystemCursor_Func(int id) {
-    BYTEHOOK_STACK_SCOPE();
-    void *c = NULL;
-    if (realSdlCreateSystemCursor) {
-        c = realSdlCreateSystemCursor(id);
-    } else {
-        SET_DLSYM_PTR(dlopen("libSDL3.so", RTLD_NOLOAD), SDL_CreateSystemCursor);
-        if (SDL_CreateSystemCursor_p) {
-            realSdlCreateSystemCursor = (sdlCreateSystemCursor_t) SDL_CreateSystemCursor_p;
-            c = realSdlCreateSystemCursor(id);
-        }
-    }
-    if (c != NULL) return c;
-    // Fall back to default cursor pointer so SetCursor is never fed garbage
-    if (realSdlGetDefaultCursor) return realSdlGetDefaultCursor();
-    SET_DLSYM_PTR(dlopen("libSDL3.so", RTLD_NOLOAD), SDL_GetDefaultCursor);
-    if (SDL_GetDefaultCursor_p) {
-        realSdlGetDefaultCursor = (sdlGetDefaultCursor_t) SDL_GetDefaultCursor_p;
-        return realSdlGetDefaultCursor();
-    }
-    return NULL;
+    // Prefer real create when it works; NULL is OK because SetCursor is no-op.
+    void *c = BYTEHOOK_CALL_PREV(custom_SDL_CreateSystemCursor_Func, sdlCreateSystemCursor_t, id);
+    BYTEHOOK_POP_STACK();
+    return c;
 }
 
 static bool proxy_SDL_SetCursor(void *cursor) {
@@ -650,7 +625,8 @@ static bool proxy_SDL_SetCursor(void *cursor) {
 }
 
 static void *proxy_SDL_CreateSystemCursor(int id) {
-    return custom_SDL_CreateSystemCursor_Func(id);
+    (void) id;
+    return NULL;
 }
 
 void create_sdl_hooks(bytehook_stub_t (*bytehook_hook_all_p)(const char *callee_path_name, const char *sym_name, void *new_func,
@@ -720,7 +696,6 @@ void *sdlDlsymProxy(const char *symbol, void *real) {
         return (void *) proxy_SDL_SetCursor;
     }
     if (strcmp(symbol, "SDL_CreateSystemCursor") == 0) {
-        if (realSdlCreateSystemCursor == NULL) realSdlCreateSystemCursor = (sdlCreateSystemCursor_t) real;
         return (void *) proxy_SDL_CreateSystemCursor;
     }
     return NULL;
