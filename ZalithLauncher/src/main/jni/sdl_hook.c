@@ -673,6 +673,93 @@ static bool proxy_SDL_StopTextInput(void *window) {
     return true;
 }
 
+
+// --- Mouse grab / relative mode safety ---
+// Entering world calls SDL_SetWindowRelativeMouseMode → SIGSEGV on this Android/SDL3.
+// Grab state is already tracked by CallbackBridge (GLFW path); soft-no-op SDL side.
+
+static bool custom_SDL_SetWindowRelativeMouseMode_Func(void *window, bool enabled) {
+    (void) window;
+    (void) enabled;
+    BYTEHOOK_POP_STACK();
+    return true;
+}
+
+static bool custom_SDL_SetRelativeMouseMode_Func(bool enabled) {
+    (void) enabled;
+    BYTEHOOK_POP_STACK();
+    return true;
+}
+
+static bool custom_SDL_CaptureMouse_Func(bool enabled) {
+    (void) enabled;
+    BYTEHOOK_POP_STACK();
+    return true;
+}
+
+static void custom_SDL_WarpMouseInWindow_Func(void *window, float x, float y) {
+    (void) window;
+    (void) x;
+    (void) y;
+    BYTEHOOK_POP_STACK();
+}
+
+static void custom_SDL_WarpMouseGlobal_Func(float x, float y) {
+    (void) x;
+    (void) y;
+    BYTEHOOK_POP_STACK();
+}
+
+static bool custom_SDL_ShowCursor_Func(void) {
+    BYTEHOOK_POP_STACK();
+    return true;
+}
+
+static bool custom_SDL_HideCursor_Func(void) {
+    BYTEHOOK_POP_STACK();
+    return true;
+}
+
+static bool custom_SDL_GetWindowRelativeMouseMode_Func(void *window) {
+    (void) window;
+    BYTEHOOK_POP_STACK();
+    return false;
+}
+
+static bool proxy_SDL_SetWindowRelativeMouseMode(void *window, bool enabled) {
+    (void) window;
+    (void) enabled;
+    return true;
+}
+
+static bool proxy_SDL_SetRelativeMouseMode(bool enabled) {
+    (void) enabled;
+    return true;
+}
+
+static bool proxy_SDL_CaptureMouse(bool enabled) {
+    (void) enabled;
+    return true;
+}
+
+static void proxy_SDL_WarpMouseInWindow(void *window, float x, float y) {
+    (void) window;
+    (void) x;
+    (void) y;
+}
+
+static void proxy_SDL_WarpMouseGlobal(float x, float y) {
+    (void) x;
+    (void) y;
+}
+
+static bool proxy_SDL_ShowCursor(void) { return true; }
+static bool proxy_SDL_HideCursor(void) { return true; }
+static bool proxy_SDL_GetWindowRelativeMouseMode(void *window) {
+    (void) window;
+    return false;
+}
+
 void create_sdl_hooks(bytehook_stub_t (*bytehook_hook_all_p)(const char *callee_path_name, const char *sym_name, void *new_func,
                                                              bytehook_hooked_t hooked, void *hooked_arg)) {
     // Don't set callee_path_name to anything besides NULL or else it won't be able to find the symbol
@@ -698,8 +785,17 @@ void create_sdl_hooks(bytehook_stub_t (*bytehook_hook_all_p)(const char *callee_
     bytehook_stub_t stub_SDL_StartTextInput = bytehook_hook_all_p(NULL, "SDL_StartTextInput", &custom_SDL_StartTextInput_Func, NULL, NULL);
     bytehook_stub_t stub_SDL_StartTextInputWithProperties = bytehook_hook_all_p(NULL, "SDL_StartTextInputWithProperties", &custom_SDL_StartTextInputWithProperties_Func, NULL, NULL);
     bytehook_stub_t stub_SDL_StopTextInput = bytehook_hook_all_p(NULL, "SDL_StopTextInput", &custom_SDL_StopTextInput_Func, NULL, NULL);
-    LOG_TO_I("SDL_Hook: hooks ready SetCursor=%p StartTextInput=%p StartTextInputWithProps=%p",
-             stub_SDL_SetCursor, stub_SDL_StartTextInput, stub_SDL_StartTextInputWithProperties);
+    // Soft-safe mouse grab / relative mode (enter world → grabMouse)
+    bytehook_stub_t stub_SDL_SetWindowRelativeMouseMode = bytehook_hook_all_p(NULL, "SDL_SetWindowRelativeMouseMode", &custom_SDL_SetWindowRelativeMouseMode_Func, NULL, NULL);
+    bytehook_stub_t stub_SDL_SetRelativeMouseMode = bytehook_hook_all_p(NULL, "SDL_SetRelativeMouseMode", &custom_SDL_SetRelativeMouseMode_Func, NULL, NULL);
+    bytehook_stub_t stub_SDL_CaptureMouse = bytehook_hook_all_p(NULL, "SDL_CaptureMouse", &custom_SDL_CaptureMouse_Func, NULL, NULL);
+    bytehook_stub_t stub_SDL_WarpMouseInWindow = bytehook_hook_all_p(NULL, "SDL_WarpMouseInWindow", &custom_SDL_WarpMouseInWindow_Func, NULL, NULL);
+    bytehook_stub_t stub_SDL_WarpMouseGlobal = bytehook_hook_all_p(NULL, "SDL_WarpMouseGlobal", &custom_SDL_WarpMouseGlobal_Func, NULL, NULL);
+    bytehook_stub_t stub_SDL_ShowCursor = bytehook_hook_all_p(NULL, "SDL_ShowCursor", &custom_SDL_ShowCursor_Func, NULL, NULL);
+    bytehook_stub_t stub_SDL_HideCursor = bytehook_hook_all_p(NULL, "SDL_HideCursor", &custom_SDL_HideCursor_Func, NULL, NULL);
+    bytehook_stub_t stub_SDL_GetWindowRelativeMouseMode = bytehook_hook_all_p(NULL, "SDL_GetWindowRelativeMouseMode", &custom_SDL_GetWindowRelativeMouseMode_Func, NULL, NULL);
+    LOG_TO_I("SDL_Hook: soft-safe SetCursor=%p StartTextInput=%p SetWindowRelativeMouseMode=%p",
+             stub_SDL_SetCursor, stub_SDL_StartTextInput, stub_SDL_SetWindowRelativeMouseMode);
 }
 
 /** customDlsym 出口：把 SDL 符号的解析结果换成 dlsym 层代理；返回 NULL 表示不拦截 */
@@ -754,6 +850,30 @@ void *sdlDlsymProxy(const char *symbol, void *real) {
     }
     if (strcmp(symbol, "SDL_StopTextInput") == 0) {
         return (void *) proxy_SDL_StopTextInput;
+    }
+    if (strcmp(symbol, "SDL_SetWindowRelativeMouseMode") == 0) {
+        return (void *) proxy_SDL_SetWindowRelativeMouseMode;
+    }
+    if (strcmp(symbol, "SDL_SetRelativeMouseMode") == 0) {
+        return (void *) proxy_SDL_SetRelativeMouseMode;
+    }
+    if (strcmp(symbol, "SDL_CaptureMouse") == 0) {
+        return (void *) proxy_SDL_CaptureMouse;
+    }
+    if (strcmp(symbol, "SDL_WarpMouseInWindow") == 0) {
+        return (void *) proxy_SDL_WarpMouseInWindow;
+    }
+    if (strcmp(symbol, "SDL_WarpMouseGlobal") == 0) {
+        return (void *) proxy_SDL_WarpMouseGlobal;
+    }
+    if (strcmp(symbol, "SDL_ShowCursor") == 0) {
+        return (void *) proxy_SDL_ShowCursor;
+    }
+    if (strcmp(symbol, "SDL_HideCursor") == 0) {
+        return (void *) proxy_SDL_HideCursor;
+    }
+    if (strcmp(symbol, "SDL_GetWindowRelativeMouseMode") == 0) {
+        return (void *) proxy_SDL_GetWindowRelativeMouseMode;
     }
     return NULL;
 }
