@@ -58,6 +58,9 @@ DECL_DLSYM(SDL_CreateWindow)
 DECL_DLSYM(SDL_CreateWindowWithProperties)
 DECL_DLSYM(SDL_DestroyWindow)
 DECL_DLSYM(SDL_EGL_GetProcAddress)
+DECL_DLSYM(SDL_SetCursor)
+DECL_DLSYM(SDL_CreateSystemCursor)
+DECL_DLSYM(SDL_GetDefaultCursor)
 
 typedef void *EGLDisplay;
 typedef void *EGLConfig;
@@ -596,6 +599,60 @@ static void proxy_SDL_UnloadObject(void *handle) {
     realSdlUnloadObject(handle);
 }
 
+
+// --- Android cursor safety ---
+// MC 26.3 calls SDL_SetCursor / CreateSystemCursor from the render thread when
+// hovering GUI. On some Android/SDL3 builds this SIGSEGVs inside libSDL3
+// (see hs_err … SDL_SetCursor). Launcher already paints cursor via
+// ZLBridgeStates; soft-no-op SetCursor and fall back CreateSystemCursor.
+
+typedef bool (*sdlSetCursor_t)(void *cursor);
+typedef void *(*sdlCreateSystemCursor_t)(int id);
+typedef void *(*sdlGetDefaultCursor_t)(void);
+
+static sdlSetCursor_t realSdlSetCursor = NULL;
+static sdlCreateSystemCursor_t realSdlCreateSystemCursor = NULL;
+static sdlGetDefaultCursor_t realSdlGetDefaultCursor = NULL;
+
+static bool custom_SDL_SetCursor_Func(void *cursor) {
+    BYTEHOOK_STACK_SCOPE();
+    // Never call into broken system-cursor paths; always report success.
+    (void) cursor;
+    return true;
+}
+
+static void *custom_SDL_CreateSystemCursor_Func(int id) {
+    BYTEHOOK_STACK_SCOPE();
+    void *c = NULL;
+    if (realSdlCreateSystemCursor) {
+        c = realSdlCreateSystemCursor(id);
+    } else {
+        SET_DLSYM_PTR(dlopen("libSDL3.so", RTLD_NOLOAD), SDL_CreateSystemCursor);
+        if (SDL_CreateSystemCursor_p) {
+            realSdlCreateSystemCursor = (sdlCreateSystemCursor_t) SDL_CreateSystemCursor_p;
+            c = realSdlCreateSystemCursor(id);
+        }
+    }
+    if (c != NULL) return c;
+    // Fall back to default cursor pointer so SetCursor is never fed garbage
+    if (realSdlGetDefaultCursor) return realSdlGetDefaultCursor();
+    SET_DLSYM_PTR(dlopen("libSDL3.so", RTLD_NOLOAD), SDL_GetDefaultCursor);
+    if (SDL_GetDefaultCursor_p) {
+        realSdlGetDefaultCursor = (sdlGetDefaultCursor_t) SDL_GetDefaultCursor_p;
+        return realSdlGetDefaultCursor();
+    }
+    return NULL;
+}
+
+static bool proxy_SDL_SetCursor(void *cursor) {
+    (void) cursor;
+    return true;
+}
+
+static void *proxy_SDL_CreateSystemCursor(int id) {
+    return custom_SDL_CreateSystemCursor_Func(id);
+}
+
 void create_sdl_hooks(bytehook_stub_t (*bytehook_hook_all_p)(const char *callee_path_name, const char *sym_name, void *new_func,
                                                              bytehook_hooked_t hooked, void *hooked_arg)) {
     // Don't set callee_path_name to anything besides NULL or else it won't be able to find the symbol
@@ -614,7 +671,11 @@ void create_sdl_hooks(bytehook_stub_t (*bytehook_hook_all_p)(const char *callee_
     bytehook_stub_t stub_SDL_UnloadObject = bytehook_hook_all_p(NULL, "SDL_UnloadObject", &custom_SDL_UnloadObject_Func, NULL, NULL);
     // 主窗口销毁跟踪，配合窗口复用（见 custom_SDL_DestroyWindow_Func）
     bytehook_stub_t stub_SDL_DestroyWindow = bytehook_hook_all_p(NULL, "SDL_DestroyWindow", &custom_SDL_DestroyWindow_Func, NULL, NULL);
-    LOG_TO_I("SDL_Hook: Successfully initialized SDL hooks, stubs: InitSubSystem=%p GetWindowFromEvent=%p GetWindowFromID=%p LoadFunction=%p CreateWindow=%p CreateWindowWithProps=%p LoadObject=%p UnloadObject=%p DestroyWindow=%p", stub_SDL_InitSubSystem, stub_SDL_GetWindowFromEvent, stub_SDL_GetWindowFromID, stub_SDL_LoadFunction, stub_SDL_CreateWindow, stub_SDL_CreateWindowWithProperties, stub_SDL_LoadObject, stub_SDL_UnloadObject, stub_SDL_DestroyWindow);
+    // Soft-safe cursor APIs (prevent SIGSEGV in SDL_SetCursor on Android)
+    bytehook_stub_t stub_SDL_SetCursor = bytehook_hook_all_p(NULL, "SDL_SetCursor", &custom_SDL_SetCursor_Func, NULL, NULL);
+    bytehook_stub_t stub_SDL_CreateSystemCursor = bytehook_hook_all_p(NULL, "SDL_CreateSystemCursor", &custom_SDL_CreateSystemCursor_Func, NULL, NULL);
+    LOG_TO_I("SDL_Hook: Successfully initialized SDL hooks, stubs: InitSubSystem=%p CreateWindow=%p DestroyWindow=%p SetCursor=%p CreateSystemCursor=%p",
+             stub_SDL_InitSubSystem, stub_SDL_CreateWindow, stub_SDL_DestroyWindow, stub_SDL_SetCursor, stub_SDL_CreateSystemCursor);
 }
 
 /** customDlsym 出口：把 SDL 符号的解析结果换成 dlsym 层代理；返回 NULL 表示不拦截 */
@@ -654,6 +715,13 @@ void *sdlDlsymProxy(const char *symbol, void *real) {
     if (strcmp(symbol, "SDL_UnloadObject") == 0) {
         if (realSdlUnloadObject == NULL) realSdlUnloadObject = (sdlUnloadObject_t) real;
         return (void *) proxy_SDL_UnloadObject;
+    }
+    if (strcmp(symbol, "SDL_SetCursor") == 0) {
+        return (void *) proxy_SDL_SetCursor;
+    }
+    if (strcmp(symbol, "SDL_CreateSystemCursor") == 0) {
+        if (realSdlCreateSystemCursor == NULL) realSdlCreateSystemCursor = (sdlCreateSystemCursor_t) real;
+        return (void *) proxy_SDL_CreateSystemCursor;
     }
     return NULL;
 }
